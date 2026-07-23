@@ -4,6 +4,9 @@
 .env
 !.env.example
 
+# Generated at container start by the web entrypoint — never committed
+web/public/config.js
+
 # Node
 node_modules/
 npm-debug.log*
