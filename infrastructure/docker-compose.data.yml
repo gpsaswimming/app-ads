@@ -1,0 +1,19 @@
+# Data tier VM — NocoDB only (DESIGN.md §3, §7). No outbound internet calls by design.
+# Reached by the App tier (ads-api) alone; the admin UI is VPN-only. NEVER publicly routed.
+#
+#   cp nocodb.env.example nocodb.env   # fill it, chmod 600
+#   docker compose -f docker-compose.data.yml up -d
+#   ./nocodb-setup.sh                  # provision the base + Ads table, print the IDs/token
+
+services:
+  nocodb:
+    image: nocodb/nocodb:latest
+    restart: unless-stopped
+    env_file: ./nocodb.env
+    volumes:
+      - nocodb_data:/usr/app/data
+    ports:
+      - "8080:8080"   # App tier (ads-api) + VPN admin UI only — NEVER public
+
+volumes:
+  nocodb_data:
