@@ -4,11 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GPSA Scoreboard Ads — Submit an Ad</title>
-    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- GPSA shared styles (canonical source: css.gpsaswimming.org) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- GPSA shared styles (toasts, brand). Canonical source: css.gpsaswimming.org -->
     <link rel="stylesheet" href="https://css.gpsaswimming.org/gpsa-tools-common.css">
     <link rel="stylesheet" href="styles.css">
     <!-- Runtime config (turnstile site key, upload host, deadline) injected at container start. -->
@@ -17,240 +16,230 @@
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onTurnstileLoad" async defer></script>
 </head>
 <body>
-    <main class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-        <header class="gpsa-header p-4 shadow-md flex items-center justify-center mb-6 rounded-lg">
-            <img src="https://assets.gpsaswimming.org/img/gpsa_logo.png"
-                 alt="GPSA Logo"
-                 class="h-16 w-16 md:h-20 md:w-20 mr-4 rounded-full"
-                 onerror="this.onerror=null; this.src='https://placehold.co/100x100/002366/FFFFFF?text=GPSA';">
-            <div>
-                <h1 class="text-2xl sm:text-3xl md:text-4xl font-bold">Scoreboard Ads</h1>
-                <p class="gpsa-header-subtitle">Submit an ad for the City Meet scoreboard.</p>
+    <header class="hero">
+        <div class="hero-inner">
+            <div class="hero-brand">
+                <img src="https://assets.gpsaswimming.org/img/gpsa_logo.png" alt="GPSA"
+                     onerror="this.onerror=null;this.src='https://placehold.co/100x100/002366/FFFFFF?text=GPSA';">
+                <span class="hero-wordmark">Greater Peninsula Swimming</span>
+                <span class="live">On the board · City Meet</span>
             </div>
-        </header>
-
-        <div class="max-w-3xl mx-auto">
-            <!-- Intro copy (verbatim, DESIGN.md §8) -->
-            <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
-                <p class="text-gray-700 leading-relaxed">
-                    Ads will scroll on the large scoreboard at the Hampton Virginia Aquaplex
-                    throughout the day (not during swim events). Proceeds from ad sales are divided
-                    50/50 between GPSA and your team.
-                    <strong class="text-gpsa-navy">Full-screen $75 &middot; Half-screen $40.</strong>
-                </p>
+            <span class="eyebrow">Scoreboard Ads</span>
+            <h1 class="hero-title">Put your business<br>on the <span class="accent">big board</span></h1>
+            <p class="hero-sub">
+                Your ad scrolls on the large scoreboard at the Hampton Virginia Aquaplex all day
+                long — between events, in front of the whole league. Proceeds are split 50/50
+                between GPSA and your team.
+            </p>
+            <div class="price-strip">
+                <div class="price-chip"><span class="label">Full-screen</span><span class="amt">$75</span></div>
+                <div class="price-chip"><span class="label">Half-screen</span><span class="amt">$40</span></div>
             </div>
+        </div>
+    </header>
 
-            <!-- ============================ CLOSED STATE ============================ -->
-            <div id="closed-state" class="hidden bg-white rounded-xl shadow-lg p-8 text-center">
-                <div class="text-5xl mb-4" aria-hidden="true">🏁</div>
-                <h2 class="text-2xl font-bold text-gpsa-navy mb-2">Submissions are closed</h2>
-                <p class="text-gray-600">
-                    Ad submissions for this season have closed. Thank you for supporting GPSA
-                    swimming — check back next season.
-                </p>
+    <main class="wrap">
+        <!-- ============================ CLOSED STATE ============================ -->
+        <div id="closed-state" class="panel hidden">
+            <div class="big" aria-hidden="true">🏁</div>
+            <h2>Submissions are closed</h2>
+            <p>Ad submissions for this season have closed. Thanks for supporting GPSA swimming — check back next year.</p>
+        </div>
+
+        <!-- ============================== SUCCESS ============================== -->
+        <div id="success-state" class="panel hidden">
+            <div class="big" aria-hidden="true">✅</div>
+            <h2>Ad received!</h2>
+            <p>Your artwork uploaded successfully.</p>
+            <dl class="receipt">
+                <div class="row"><dt>Reference ID</dt><dd id="success-ad-id"></dd></div>
+                <div class="row"><dt>Amount due</dt><dd id="success-amount"></dd></div>
+            </dl>
+            <div class="pay-callout">
+                <div class="h">How to pay</div>
+                <p id="success-pay" style="margin:0;"></p>
             </div>
+            <p class="note">A confirmation email from the Ad Coordinator is on its way. If your artwork needs a closer look, we'll follow up shortly.</p>
+        </div>
 
-            <!-- ============================== SUCCESS ============================== -->
-            <div id="success-state" class="hidden bg-white rounded-xl shadow-lg p-8">
-                <div class="text-center mb-6">
-                    <div class="text-5xl mb-3" aria-hidden="true">✅</div>
-                    <h2 class="text-2xl font-bold text-gpsa-navy">Ad received!</h2>
-                    <p class="text-gray-600 mt-1">Your artwork uploaded successfully.</p>
+        <!-- ================================ FORM ================================ -->
+        <form id="ad-form" novalidate>
+
+            <!-- Submitter -->
+            <section class="card">
+                <p class="kicker">Step 1</p>
+                <h2>Your contact info</h2>
+                <p class="lead">So we can send your receipt and follow up if anything's off.</p>
+                <div class="field">
+                    <label for="submitter_name">Name <span class="req">*</span></label>
+                    <input type="text" id="submitter_name" name="submitter_name" required maxlength="200" autocomplete="name">
                 </div>
-                <dl class="space-y-3 border-t border-gray-200 pt-4">
-                    <div class="flex justify-between gap-4">
-                        <dt class="font-semibold text-gray-500">Reference ID</dt>
-                        <dd id="success-ad-id" class="font-mono text-sm text-right break-all"></dd>
-                    </div>
-                    <div class="flex justify-between gap-4">
-                        <dt class="font-semibold text-gray-500">Amount due</dt>
-                        <dd id="success-amount" class="font-bold text-gpsa-navy text-right"></dd>
-                    </div>
-                </dl>
-                <div class="mt-4 p-4 bg-blue-50 rounded-lg">
-                    <p class="font-semibold text-gpsa-navy mb-1">How to pay</p>
-                    <p id="success-pay" class="text-gray-700 text-sm"></p>
+                <div class="field">
+                    <label for="submitter_email">Email <span class="req">*</span></label>
+                    <input type="email" id="submitter_email" name="submitter_email" required maxlength="320" autocomplete="email">
                 </div>
-                <p class="text-sm text-gray-500 mt-4">
-                    A confirmation email is on its way. If your artwork needs a closer look, we'll
-                    follow up shortly.
-                </p>
-            </div>
+                <div class="field">
+                    <label for="submitter_phone">Phone <span class="opt">(optional)</span></label>
+                    <input type="tel" id="submitter_phone" name="submitter_phone" maxlength="40" autocomplete="tel">
+                </div>
+            </section>
 
-            <!-- ================================ FORM ================================ -->
-            <form id="ad-form" class="space-y-6" novalidate>
-
-                <!-- Submitter -->
-                <fieldset class="bg-white rounded-xl shadow-lg p-6">
-                    <legend class="text-lg font-bold text-gpsa-navy px-2">Your contact info</legend>
-                    <p class="text-sm text-gray-500 mb-4">So we can send your receipt and follow up if needed.</p>
-                    <div class="space-y-4">
-                        <div>
-                            <label for="submitter_name" class="block font-semibold text-gray-700 mb-1">Name <span class="text-gpsa-red">*</span></label>
-                            <input type="text" id="submitter_name" name="submitter_name" required maxlength="200" autocomplete="name" class="w-full">
-                        </div>
-                        <div>
-                            <label for="submitter_email" class="block font-semibold text-gray-700 mb-1">Email <span class="text-gpsa-red">*</span></label>
-                            <input type="email" id="submitter_email" name="submitter_email" required maxlength="320" autocomplete="email" class="w-full">
-                        </div>
-                        <div>
-                            <label for="submitter_phone" class="block font-semibold text-gray-700 mb-1">Phone <span class="text-gray-400 font-normal">(optional)</span></label>
-                            <input type="tel" id="submitter_phone" name="submitter_phone" maxlength="40" autocomplete="tel" class="w-full">
-                        </div>
+            <!-- Advertiser -->
+            <section class="card">
+                <p class="kicker">Step 2</p>
+                <h2>The advertiser</h2>
+                <p class="lead">Who the ad is for.</p>
+                <div class="field">
+                    <label for="company_name">Company / business name <span class="req">*</span></label>
+                    <input type="text" id="company_name" name="company_name" required maxlength="200">
+                </div>
+                <div class="field">
+                    <label for="team">Affiliation <span class="req">*</span></label>
+                    <select id="team" name="team" required>
+                        <option value="" disabled selected>Choose a team, or GPSA for a league-level ad…</option>
+                        <optgroup label="Team">
+                            <option value="Beaconsdale">Beaconsdale</option>
+                            <option value="Colony">Colony</option>
+                            <option value="Coventry">Coventry</option>
+                            <option value="Elizabeth Lake">Elizabeth Lake</option>
+                            <option value="Glendale">Glendale</option>
+                            <option value="Hidenwood">Hidenwood</option>
+                            <option value="James River">James River</option>
+                            <option value="Kiln Creek">Kiln Creek</option>
+                            <option value="Marlbank">Marlbank</option>
+                            <option value="Poquoson">Poquoson</option>
+                            <option value="Riverdale">Riverdale</option>
+                            <option value="Running Man">Running Man</option>
+                            <option value="Village Green">Village Green</option>
+                            <option value="Warwick Yacht">Warwick Yacht</option>
+                            <option value="Wendwood">Wendwood</option>
+                            <option value="Willow Oaks">Willow Oaks</option>
+                            <option value="Windy Point">Windy Point</option>
+                            <option value="Wythe">Wythe</option>
+                        </optgroup>
+                        <optgroup label="League-level">
+                            <option value="GPSA">GPSA (league-level ad)</option>
+                        </optgroup>
+                    </select>
+                    <p class="hint">Sets how you pay: a team ad is paid through your team; a GPSA ad is paid to the league.</p>
+                </div>
+                <div class="field">
+                    <label for="ad_title">Ad title <span class="req">*</span></label>
+                    <input type="text" id="ad_title" name="ad_title" required maxlength="200" placeholder="e.g. Joe's Pizza — Summer Special">
+                    <p class="hint">A short name for our records — not shown on the scoreboard.</p>
+                </div>
+                <label class="check">
+                    <input type="checkbox" id="submitter_is_advertiser" name="submitter_is_advertiser">
+                    <span>I am the advertiser <span class="opt">— use my contact info above</span></span>
+                </label>
+                <div id="advertiser-contact">
+                    <p class="hint" style="margin-top:0;">Advertiser's contact info:</p>
+                    <div class="field">
+                        <label for="advertiser_name">Advertiser name <span class="req">*</span></label>
+                        <input type="text" id="advertiser_name" name="advertiser_name" maxlength="200">
                     </div>
-                </fieldset>
-
-                <!-- Advertiser -->
-                <fieldset class="bg-white rounded-xl shadow-lg p-6">
-                    <legend class="text-lg font-bold text-gpsa-navy px-2">The advertiser</legend>
-                    <p class="text-sm text-gray-500 mb-4">Who the ad is for.</p>
-                    <div class="space-y-4">
-                        <div>
-                            <label for="company_name" class="block font-semibold text-gray-700 mb-1">Company / business name <span class="text-gpsa-red">*</span></label>
-                            <input type="text" id="company_name" name="company_name" required maxlength="200" class="w-full">
-                        </div>
-                        <div>
-                            <label for="team" class="block font-semibold text-gray-700 mb-1">Affiliation <span class="text-gpsa-red">*</span></label>
-                            <select id="team" name="team" required class="w-full">
-                                <option value="" disabled selected>Select a team, or GPSA for a league-level ad…</option>
-                                <optgroup label="Team">
-                                    <option value="Beaconsdale">Beaconsdale</option>
-                                    <option value="Colony">Colony</option>
-                                    <option value="Coventry">Coventry</option>
-                                    <option value="Elizabeth Lake">Elizabeth Lake</option>
-                                    <option value="Glendale">Glendale</option>
-                                    <option value="Hidenwood">Hidenwood</option>
-                                    <option value="James River">James River</option>
-                                    <option value="Kiln Creek">Kiln Creek</option>
-                                    <option value="Marlbank">Marlbank</option>
-                                    <option value="Poquoson">Poquoson</option>
-                                    <option value="Riverdale">Riverdale</option>
-                                    <option value="Running Man">Running Man</option>
-                                    <option value="Village Green">Village Green</option>
-                                    <option value="Warwick Yacht">Warwick Yacht</option>
-                                    <option value="Wendwood">Wendwood</option>
-                                    <option value="Willow Oaks">Willow Oaks</option>
-                                    <option value="Windy Point">Windy Point</option>
-                                    <option value="Wythe">Wythe</option>
-                                </optgroup>
-                                <optgroup label="League-level">
-                                    <option value="GPSA">GPSA (league-level ad)</option>
-                                </optgroup>
-                            </select>
-                            <p class="text-xs text-gray-500 mt-1">Determines how you'll pay: a team ad is paid to your team; a GPSA ad is paid to the league.</p>
-                        </div>
-                        <div>
-                            <label for="ad_title" class="block font-semibold text-gray-700 mb-1">Ad title <span class="text-gpsa-red">*</span></label>
-                            <input type="text" id="ad_title" name="ad_title" required maxlength="200" class="w-full">
-                            <p class="text-xs text-gray-500 mt-1">A short name for this ad (for our records — not shown on the scoreboard).</p>
-                        </div>
-                        <label class="flex items-start gap-3 cursor-pointer pt-1">
-                            <input type="checkbox" id="submitter_is_advertiser" name="submitter_is_advertiser" class="mt-1 h-5 w-5">
-                            <span class="text-gray-700">I am the advertiser <span class="text-gray-400 font-normal">(use my contact info above)</span></span>
-                        </label>
-                        <div id="advertiser-contact" class="space-y-4 border-l-4 border-gray-100 pl-4">
-                            <p class="text-sm text-gray-500">Advertiser's contact info:</p>
-                            <div>
-                                <label for="advertiser_name" class="block font-semibold text-gray-700 mb-1">Advertiser name <span class="text-gpsa-red">*</span></label>
-                                <input type="text" id="advertiser_name" name="advertiser_name" maxlength="200" class="w-full">
-                            </div>
-                            <div>
-                                <label for="advertiser_email" class="block font-semibold text-gray-700 mb-1">Advertiser email <span class="text-gpsa-red">*</span></label>
-                                <input type="email" id="advertiser_email" name="advertiser_email" maxlength="320" class="w-full">
-                            </div>
-                            <div>
-                                <label for="advertiser_phone" class="block font-semibold text-gray-700 mb-1">Advertiser phone <span class="text-gray-400 font-normal">(optional)</span></label>
-                                <input type="tel" id="advertiser_phone" name="advertiser_phone" maxlength="40" class="w-full">
-                            </div>
-                        </div>
+                    <div class="field">
+                        <label for="advertiser_email">Advertiser email <span class="req">*</span></label>
+                        <input type="email" id="advertiser_email" name="advertiser_email" maxlength="320">
                     </div>
-                </fieldset>
-
-                <!-- Ad / artwork -->
-                <fieldset class="bg-white rounded-xl shadow-lg p-6">
-                    <legend class="text-lg font-bold text-gpsa-navy px-2">The ad</legend>
-                    <p class="text-sm text-gray-500 mb-4">Pick a placement, then upload a photo (PNG or JPG). Use the matching PowerPoint template to get the size exactly right.</p>
-
-                    <div class="space-y-3" role="radiogroup" aria-label="Placement">
-                        <label class="placement-card" data-placement="FULL_SCREEN">
-                            <input type="radio" name="placement" value="FULL_SCREEN" class="sr-only" required>
-                            <span class="placement-diagram diagram-full" aria-hidden="true"></span>
-                            <span class="placement-body">
-                                <span class="placement-title">Full-screen <span class="placement-price">$75</span></span>
-                                <span class="placement-meta">18&times;8&Prime; (9:4) &middot; export 2700&times;1200&nbsp;px</span>
-                                <a href="https://assets.gpsaswimming.org/ad-templates/scoreboard-ad-full-screen.pptx" class="placement-template" target="_blank" rel="noopener">Download full-screen template (.pptx)</a>
-                            </span>
-                        </label>
-                        <label class="placement-card" data-placement="HALF_SCREEN">
-                            <input type="radio" name="placement" value="HALF_SCREEN" class="sr-only" required>
-                            <span class="placement-diagram diagram-half" aria-hidden="true"></span>
-                            <span class="placement-body">
-                                <span class="placement-title">Half-screen <span class="placement-price">$40</span></span>
-                                <span class="placement-meta">9&times;8&Prime; (9:8) &middot; export 1350&times;1200&nbsp;px</span>
-                                <a href="https://assets.gpsaswimming.org/ad-templates/scoreboard-ad-half-screen.pptx" class="placement-template" target="_blank" rel="noopener">Download half-screen template (.pptx)</a>
-                            </span>
-                        </label>
+                    <div class="field">
+                        <label for="advertiser_phone">Advertiser phone <span class="opt">(optional)</span></label>
+                        <input type="tel" id="advertiser_phone" name="advertiser_phone" maxlength="40">
                     </div>
+                </div>
+            </section>
 
-                    <div class="mt-5">
-                        <label for="artwork" class="block font-semibold text-gray-700 mb-1">Artwork file <span class="text-gpsa-red">*</span></label>
-                        <input type="file" id="artwork" name="artwork" accept="image/png,image/jpeg" required class="w-full">
-                        <p class="text-xs text-gray-500 mt-1">PNG or JPG photo, up to 50&nbsp;MB. The exact size &amp; aspect are checked after upload.</p>
-                    </div>
-                </fieldset>
+            <!-- The ad / artwork -->
+            <section class="card">
+                <p class="kicker">Step 3</p>
+                <h2>The ad</h2>
+                <p class="lead">Pick a placement, then upload your artwork. Use the matching PowerPoint template to nail the size.</p>
 
-                <!-- Payment -->
-                <fieldset class="bg-white rounded-xl shadow-lg p-6">
-                    <legend class="text-lg font-bold text-gpsa-navy px-2">Payment</legend>
-                    <div id="payment-empty" class="text-sm text-gray-500">Choose an affiliation and placement above to see how to pay.</div>
-
-                    <!-- Team affiliation → pay the team (read-only) -->
-                    <div id="payment-team" class="hidden">
-                        <p class="text-gray-700">
-                            <span id="pay-team-label" class="font-semibold"></span>
-                        </p>
-                    </div>
-
-                    <!-- GPSA affiliation → choose a method -->
-                    <div id="payment-gpsa" class="hidden">
-                        <p class="text-sm text-gray-500 mb-3">How would you like to pay GPSA?</p>
-                        <div class="space-y-2" role="radiogroup" aria-label="Payment method">
-                            <label class="flex items-center gap-3 cursor-pointer">
-                                <input type="radio" name="payment_method_gpsa" value="CHECK" class="h-5 w-5">
-                                <span class="text-gray-700">Mail a check to GPSA</span>
-                            </label>
-                            <label class="flex items-center gap-3 cursor-pointer">
-                                <input type="radio" name="payment_method_gpsa" value="SQUARE_INVOICE" class="h-5 w-5">
-                                <span class="text-gray-700">Square invoice (we'll email you one)</span>
-                            </label>
-                        </div>
-                    </div>
-                </fieldset>
-
-                <!-- Rights -->
-                <fieldset class="bg-white rounded-xl shadow-lg p-6">
-                    <legend class="text-lg font-bold text-gpsa-navy px-2">Rights</legend>
-                    <label class="flex items-start gap-3 cursor-pointer">
-                        <input type="checkbox" id="rights_confirmed" name="rights_confirmed" required class="mt-1 h-5 w-5">
-                        <span class="text-gray-700">I have the right to use this artwork and grant GPSA permission to display it on the scoreboard. <span class="text-gpsa-red">*</span></span>
+                <div class="board-pick" role="radiogroup" aria-label="Placement">
+                    <label class="placement-card" data-placement="FULL_SCREEN">
+                        <input type="radio" name="placement" value="FULL_SCREEN" class="sr-only" required>
+                        <span class="screen-wrap"><span class="screen screen-full" aria-hidden="true"></span></span>
+                        <span class="placement-name">Full-screen <span class="placement-price">$75</span></span>
+                        <span class="placement-meta">9:4 &middot; 18&times;8&Prime; &middot; export 2700&times;1200&nbsp;px</span>
+                        <a class="placement-template" href="https://assets.gpsaswimming.org/ad-templates/scoreboard-ad-full-screen.pptx" target="_blank" rel="noopener">Download full-screen template</a>
                     </label>
-                </fieldset>
+                    <label class="placement-card" data-placement="HALF_SCREEN">
+                        <input type="radio" name="placement" value="HALF_SCREEN" class="sr-only" required>
+                        <span class="screen-wrap"><span class="screen screen-half" aria-hidden="true"></span></span>
+                        <span class="placement-name">Half-screen <span class="placement-price">$40</span></span>
+                        <span class="placement-meta">9:8 &middot; 9&times;8&Prime; &middot; export 1350&times;1200&nbsp;px</span>
+                        <a class="placement-template" href="https://assets.gpsaswimming.org/ad-templates/scoreboard-ad-half-screen.pptx" target="_blank" rel="noopener">Download half-screen template</a>
+                    </label>
+                </div>
 
-                <!-- Turnstile + submit -->
-                <div class="bg-white rounded-xl shadow-lg p-6">
-                    <div id="turnstile-widget" class="mb-4"></div>
-                    <button type="submit" id="submit-btn" class="btn btn-primary w-full text-lg py-3">Submit ad</button>
+                <!-- Hardware-protection requirement, not just a style note. -->
+                <div class="led-warning">
+                    <span class="mark" aria-hidden="true">⚠️</span>
+                    <p><strong>Dark or black backgrounds only.</strong> The scoreboard is a high-brightness LED wall — white or white-dominated artwork can overdrive and damage its LEDs, so the facility requires a dark background with light-colored text. <strong>Ads on a white background will be rejected.</strong></p>
+                </div>
 
-                    <!-- Upload progress (shown during the direct upload step) -->
-                    <div id="upload-progress" class="hidden mt-4">
-                        <div class="flex justify-between text-sm text-gray-600 mb-1">
-                            <span>Uploading artwork…</span>
-                            <span id="progress-pct">0%</span>
-                        </div>
-                        <div class="progress-track"><div id="progress-bar" class="progress-fill" style="width:0%"></div></div>
+                <div class="field">
+                    <label for="artwork">Artwork file <span class="req">*</span></label>
+                    <input type="file" id="artwork" name="artwork" accept="image/png,image/jpeg" required>
+                    <p class="hint">Full-color PNG or JPG, up to 50&nbsp;MB. The exact size &amp; aspect are checked after upload.</p>
+                </div>
+
+                <div class="tips">
+                    <h3>Make it read on the board</h3>
+                    <ul>
+                        <li><span class="yes" aria-hidden="true">✓</span><span>Full color on a black or very dark background.</span></li>
+                        <li><span class="yes" aria-hidden="true">✓</span><span>Bold block (sans-serif) type — script and serif fonts blur on the board.</span></li>
+                        <li><span class="yes" aria-hidden="true">✓</span><span>Few words. Don't use eight words when four will do.</span></li>
+                        <li><span class="no" aria-hidden="true">✕</span><span>No white or light backgrounds — they'll be rejected.</span></li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Payment -->
+            <section class="card">
+                <p class="kicker">Step 4</p>
+                <h2>Payment</h2>
+                <div id="payment-empty" class="hint" style="margin-top:0;">Choose an affiliation and placement above to see how to pay.</div>
+
+                <div id="payment-team" class="hidden">
+                    <div class="pay-box"><span id="pay-team-label"></span></div>
+                    <p class="pay-note">Your GPSA team representative collects ad fees and submits payment for all ads and meet entries before City Meet.</p>
+                </div>
+
+                <div id="payment-gpsa" class="hidden">
+                    <p class="lead" style="margin-bottom:12px;">How would you like to pay GPSA?</p>
+                    <div role="radiogroup" aria-label="Payment method" style="display:grid;gap:10px;">
+                        <label class="check"><input type="radio" name="payment_method_gpsa" value="CHECK"><span>Mail a check to GPSA</span></label>
+                        <label class="check"><input type="radio" name="payment_method_gpsa" value="SQUARE_INVOICE"><span>Square invoice — we'll email you one</span></label>
                     </div>
                 </div>
-            </form>
+            </section>
+
+            <!-- Rights -->
+            <section class="card">
+                <p class="kicker">Step 5</p>
+                <h2>Rights</h2>
+                <label class="check">
+                    <input type="checkbox" id="rights_confirmed" name="rights_confirmed" required>
+                    <span>I have the right to use this artwork and grant GPSA permission to display it on the scoreboard. <span class="req">*</span></span>
+                </label>
+            </section>
+
+            <!-- Turnstile + submit -->
+            <section class="card">
+                <div id="turnstile-widget" class="turnstile-holder"></div>
+                <button type="submit" id="submit-btn" class="btn">Submit ad</button>
+                <div id="upload-progress" class="progress-wrap hidden">
+                    <div class="progress-head"><span>Uploading artwork…</span><span id="progress-pct">0%</span></div>
+                    <div class="progress-track"><div id="progress-bar" class="progress-fill"></div></div>
+                </div>
+            </section>
+        </form>
+
+        <div class="helpbar">
+            <div>Each ad needs its own submission. You'll get a confirmation email from the Ad Coordinator.</div>
+            <div>Large file? You may need to send it through a file drop — email <a href="mailto:ads@gpsaswimming.org">ads@gpsaswimming.org</a>.</div>
+            <div>Trouble submitting? <a href="mailto:ads@gpsaswimming.org">ads@gpsaswimming.org</a> is here to help.</div>
         </div>
     </main>
 
