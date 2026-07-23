@@ -62,6 +62,8 @@
     turnstileRendered = true;
     turnstileWidgetId = window.turnstile.render('#turnstile-widget', {
       sitekey: siteKey,
+      theme: 'light',
+      size: 'flexible', // expand to the container width (full-width) to match the form
       callback: (token) => { turnstileToken = token; },
       'error-callback': () => { turnstileToken = null; },
       'expired-callback': () => { turnstileToken = null; },
