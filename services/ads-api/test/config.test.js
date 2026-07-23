@@ -29,7 +29,7 @@ test('loads a complete env and applies defaults', () => {
   assert.equal(cfg.minio.bucket, 'gpsa-ads');
   assert.equal(cfg.pricing.FULL_SCREEN, 9000);
   assert.equal(cfg.pricing.HALF_SCREEN, 5000);
-  assert.equal(cfg.gemini.model, 'gemini-2.5-flash');
+  assert.equal(cfg.gemini.model, 'gemini-flash-latest');
   assert.equal(cfg.nocodb.url, 'http://nocodb.gpsa.local:8080'); // trailing slash stripped
   assert.ok(Number.isFinite(cfg.submissionDeadlineMs));
 });
@@ -54,8 +54,8 @@ test('rejects a bad notify email', () => {
 });
 
 test('overrides prices and model from env', () => {
-  const cfg = loadConfig(fullEnv({ PRICE_FULL_CENTS: '9000', PRICE_HALF_CENTS: '5000', GEMINI_MODEL: 'gemini-flash-latest' }));
+  const cfg = loadConfig(fullEnv({ PRICE_FULL_CENTS: '9000', PRICE_HALF_CENTS: '5000', GEMINI_MODEL: 'gemini-2.0-flash' }));
   assert.equal(cfg.pricing.FULL_SCREEN, 9000);
   assert.equal(cfg.pricing.HALF_SCREEN, 5000);
-  assert.equal(cfg.gemini.model, 'gemini-flash-latest');
+  assert.equal(cfg.gemini.model, 'gemini-2.0-flash');
 });
