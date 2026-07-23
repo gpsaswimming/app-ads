@@ -291,7 +291,14 @@
     setProgress(0);
     setSubmitting(true, 'Uploading…');
 
+    const uploadFailed = (msg) => {
+      showToast(msg, 'error', 9000);
+      $('upload-progress').classList.add('hidden');
+      setSubmitting(false);
+    };
+
     const xhr = new XMLHttpRequest();
+    xhr.timeout = 120000;
     xhr.upload.addEventListener('progress', (ev) => {
       if (ev.lengthComputable) setProgress(ev.loaded / ev.total);
     });
@@ -300,18 +307,39 @@
         setProgress(1);
         showSuccess(result, data);
       } else {
-        showToast('Upload failed (' + xhr.status + '). Please try submitting again.', 'error', 8000);
-        $('upload-progress').classList.add('hidden');
-        setSubmitting(false);
+        // A readable HTTP error — map the status / storage error code to something useful.
+        uploadFailed(describeUploadError(xhr.status, xhr.responseText));
       }
     });
+    // Fires when the browser can't read a response at all: a dropped connection, or an
+    // error response with no CORS header (which the browser hides from JS). We can't see
+    // a status here, so we explain the likely causes rather than claim "network error".
     xhr.addEventListener('error', () => {
-      showToast('Upload failed — network error. Please try again.', 'error', 8000);
-      $('upload-progress').classList.add('hidden');
-      setSubmitting(false);
+      uploadFailed("We couldn't upload your artwork — the connection dropped or the upload was refused (a very large file can do this). Please try again; if it keeps happening, email ads@gpsaswimming.org.");
+    });
+    xhr.addEventListener('timeout', () => {
+      uploadFailed('The upload timed out. Please check your connection and try again.');
     });
     xhr.open('POST', target);
     xhr.send(fd);
+  }
+
+  // Turn an upload-host HTTP error into a message a person can act on. Storage returns an
+  // XML body like <Error><Code>…</Code><Message>…</Message></Error> when readable.
+  function describeUploadError(status, body) {
+    let code = '';
+    const m = /<Code>([^<]+)<\/Code>/.exec(body || '');
+    if (m) code = m[1];
+    if (status === 413 || code === 'EntityTooLarge') {
+      return 'That file is too large to upload. Please export a smaller image and try again.';
+    }
+    if (status === 403 || code === 'ExpiredToken' || code === 'AccessDenied') {
+      return 'The upload link expired before the file finished. Please submit the form again.';
+    }
+    if (status === 400) {
+      return "The upload was rejected — the file may not match the expected type or size. Please re-export and try again.";
+    }
+    return `The upload failed (error ${status}). Please try again, or email ads@gpsaswimming.org if it persists.`;
   }
 
   function payInstruction(data, amount) {

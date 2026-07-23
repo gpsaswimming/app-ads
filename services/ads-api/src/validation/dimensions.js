@@ -35,6 +35,7 @@ export async function validateDimensions(buffer, placement, contentType) {
     return { ok: false, width: width || null, height: height || null, reason: 'Could not read image dimensions' };
   }
 
+  // Ratio only — resolution is the submitter's call (DESIGN.md §5).
   const aspect = width / height;
   const aspectOff = Math.abs(aspect - spec.aspect) / spec.aspect;
   if (aspectOff > ASPECT_TOLERANCE) {
@@ -43,15 +44,6 @@ export async function validateDimensions(buffer, placement, contentType) {
       width,
       height,
       reason: `${width}×${height} is not the required ${spec.label} aspect ratio`,
-    };
-  }
-
-  if (width < spec.minWidth || height < spec.minHeight) {
-    return {
-      ok: false,
-      width,
-      height,
-      reason: `${width}×${height} is below the required minimum ${spec.minWidth}×${spec.minHeight} for ${spec.label}`,
     };
   }
 
