@@ -1,0 +1,12 @@
+Hi <%= it.name %>,
+
+Thanks for your GPSA scoreboard ad submission — unfortunately we couldn't accept the
+artwork as sent:
+
+  Ad:     <%= it.adTitle %>
+  Reason: <%= it.reason %>
+
+Please re-export at the required size for your placement (<%= it.placementLabel %>) and
+submit again. Each resubmission is a fresh entry.
+
+— GPSA Scoreboard Ads

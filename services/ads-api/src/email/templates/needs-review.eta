@@ -1,0 +1,13 @@
+Hi <%= it.name %>,
+
+We've received your GPSA scoreboard ad submission:
+
+  Ad:        <%= it.adTitle %>
+  Placement: <%= it.placementLabel %>
+
+It's currently under review and we'll follow up shortly with the outcome and payment
+details. No action is needed from you right now.
+
+Your ad ID is <%= it.adId %>.
+
+— GPSA Scoreboard Ads
