@@ -1,0 +1,8 @@
+// Runtime configuration for the browser. Rendered from this template at container
+// start by docker-entrypoint.sh (envsubst) into /usr/share/nginx/html/config.js.
+// Only PUBLIC values live here — never a secret (DESIGN.md §3 inv 3).
+window.GPSA_ADS_CONFIG = {
+  turnstileSiteKey: "${TURNSTILE_SITE_KEY}",
+  uploadUrl: "${UPLOAD_URL}",
+  submissionDeadline: "${SUBMISSION_DEADLINE}",
+};

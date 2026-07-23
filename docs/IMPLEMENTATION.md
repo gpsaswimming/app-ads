@@ -67,19 +67,39 @@ Read first: DESIGN.md §2 (flow), §3 (invariants), §4 (data model), §5 (valid
 
 ## Phase 2 — Web frontend (`web/` → image `app-ads-web`)
 Read first: DESIGN.md §8 (form), §2 (flow), §1a (upload).
-- [ ] `public/` static form per §8 field order; shared GPSA CSS + Inter; brand colors;
+- [x] `public/` static form per §8 field order; shared GPSA CSS + Inter; brand colors;
       `max-w-7xl mx-auto`, `showToast()`, `escapeHtml()`.
-- [ ] Intro copy (venue + 50/50 split + pricing) verbatim; per-placement template download links.
-- [ ] Behavior: "I am the advertiser" auto-fill; placement→price display; payment method by
+- [x] Intro copy (venue + 50/50 split + pricing) verbatim; per-placement template download links
+      (`assets.gpsaswimming.org/ad-templates/scoreboard-ad-{full,half}-screen.pptx`).
+- [x] Behavior: "I am the advertiser" auto-fill; placement→price display; payment method by
       affiliation (team ⇒ read-only "pay your team"; GPSA ⇒ Check/Square Invoice); required rights
-      checkbox; Turnstile widget.
-- [ ] Two-step submit: POST metadata → `/api/submit`; on `{presign}` do the direct multipart POST
-      to `UPLOAD_URL`; progress → success (Ad_ID + amount + how to pay).
-- [ ] Deadline-closed state.
-- [ ] `nginx.conf` — serve static + reverse-proxy `/api/*` to the API host.
-- [ ] Entrypoint `envsubst` injects `TURNSTILE_SITE_KEY` + `UPLOAD_URL` into a `config.js` at start;
-      Dockerfile.
+      checkbox; Turnstile widget (explicit render, public site key from `config.js`).
+- [x] Two-step submit: POST metadata → `/api/submit`; on `{presign}` do the direct multipart POST
+      to the presign URL (asserted to start with `UPLOAD_URL`); progress → success (Ad_ID + amount +
+      how to pay).
+- [x] Deadline-closed state (form checks injected `SUBMISSION_DEADLINE` at load; API 403 is backstop).
+- [x] `nginx.conf` — serve static + reverse-proxy `/api/*` to the API host (`API_UPSTREAM`);
+      `/internal/*` returns 404 at the DMZ.
+- [x] Entrypoint `envsubst` injects `TURNSTILE_SITE_KEY` + `UPLOAD_URL` + `SUBMISSION_DEADLINE` into
+      `config.js`, and `API_UPSTREAM` into `nginx.conf`, at container start; Dockerfile (nginx:alpine).
 - **Verify:** run the web image against the dev API; submit a real test ad end-to-end.
+  **Done (2026-07-23):** built `app-ads-web` and ran it on a shared network with the Phase 1 dev API.
+  Confirmed: form served; `config.js` rendered with all three injected values (`no-store`); same-origin
+  `/api/*` reverse-proxies to the API. Drove the submit path through the proxy — a valid body + passing
+  test Turnstile clears deadline → Turnstile → schema → cross-validation and reaches the NocoDB write
+  (fails only there, no DB in this harness), proving the form's JSON body matches the API contract;
+  bad payment-method-for-team → cross-validation 400; past deadline → `403 SUBMISSIONS_CLOSED`;
+  `/internal/uploaded` → 404 at the DMZ. **Not exercised (needs Phase 3/4 infra):** the real presigned
+  upload landing in MinIO — the presign requires a live NocoDB row and the upload requires the
+  Phase 3 proxy + MinIO. Interactive client behaviors (auto-fill, placement→price, closed-state render)
+  are code-verified, not browser-driven.
+
+> **Web-tier env note (deviation from §7):** the §7 web-env table lists only `TURNSTILE_SITE_KEY`,
+> `UPLOAD_URL`. Phase 2 adds two more CONFIG (non-secret) values the DMZ genuinely needs and that the
+> "environment-agnostic image" principle requires be injected, not baked: `SUBMISSION_DEADLINE` (so the
+> form renders the closed state at load, per §8's "form is primary gate, API is backstop") and
+> `API_UPSTREAM` (the App-tier host:port nginx proxies `/api/*` to). Both are documented in
+> `web/web.env.example`.
 
 ## Phase 3 — Upload proxy (`proxy/` → image `app-ads-proxy`)
 Read first: DESIGN.md §1a, §7 (`minio-proxy.conf` sketch).

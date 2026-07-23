@@ -1,0 +1,113 @@
+/* Page-specific styles for the Scoreboard Ads form. Shared look (header, buttons,
+   toasts) comes from css.gpsaswimming.org/gpsa-tools-common.css; this file only adds
+   the form-specific pieces (brand text colors, inputs, placement cards, progress). */
+
+:root {
+    --gpsa-navy: #002366;
+    --gpsa-navy-hover: #0033a0;
+    --gpsa-red: #d9242b;
+}
+
+body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background-color: #f3f4f6;
+    color: #1f2937;
+}
+
+.text-gpsa-navy { color: var(--gpsa-navy); }
+.text-gpsa-red { color: var(--gpsa-red); }
+
+/* Form controls — Tailwind CDN ships no input chrome, so style them here. */
+input[type="text"],
+input[type="email"],
+input[type="tel"],
+input[type="file"],
+select {
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    padding: 0.625rem 0.75rem;
+    font-size: 1rem;
+    background-color: #fff;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="tel"]:focus,
+select:focus {
+    outline: none;
+    border-color: var(--gpsa-navy);
+    box-shadow: 0 0 0 3px rgba(0, 35, 102, 0.12);
+}
+input[type="checkbox"],
+input[type="radio"] {
+    accent-color: var(--gpsa-navy);
+    flex: none;
+}
+fieldset { border: none; }
+
+/* Placement cards — a label wrapping a visually-hidden radio. */
+.placement-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    cursor: pointer;
+    transition: border-color 0.15s, background-color 0.15s;
+}
+.placement-card:hover { border-color: #c7d2fe; }
+.placement-card.selected {
+    border-color: var(--gpsa-navy);
+    background-color: #f5f8ff;
+}
+.placement-card:focus-within {
+    box-shadow: 0 0 0 3px rgba(0, 35, 102, 0.12);
+}
+
+/* Small proportional diagrams of the two placements (aspect via CSS box size). */
+.placement-diagram {
+    flex: none;
+    background: linear-gradient(135deg, var(--gpsa-navy), var(--gpsa-navy-hover));
+    border-radius: 0.25rem;
+    height: 3rem;
+}
+.diagram-full { width: 6.75rem; }   /* 9:4  → 3rem × 2.25 */
+.diagram-half { width: 3.375rem; }  /* 9:8  → 3rem × 1.125 */
+
+.placement-body { display: flex; flex-direction: column; gap: 0.125rem; }
+.placement-title { font-weight: 700; color: var(--gpsa-navy); }
+.placement-price {
+    display: inline-block;
+    margin-left: 0.25rem;
+    color: var(--gpsa-red);
+    font-weight: 700;
+}
+.placement-meta { font-size: 0.8125rem; color: #6b7280; }
+.placement-template {
+    font-size: 0.8125rem;
+    color: var(--gpsa-navy-hover);
+    text-decoration: underline;
+    margin-top: 0.125rem;
+    width: fit-content;
+}
+.placement-template:hover { color: var(--gpsa-red); }
+
+/* Upload progress bar. */
+.progress-track {
+    height: 0.625rem;
+    background-color: #e5e7eb;
+    border-radius: 9999px;
+    overflow: hidden;
+}
+.progress-fill {
+    height: 100%;
+    background-color: var(--gpsa-navy);
+    border-radius: 9999px;
+    transition: width 0.2s ease;
+}
+
+/* Disabled submit button while in flight. */
+button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.hidden { display: none !important; }
