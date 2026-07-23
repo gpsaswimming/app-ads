@@ -122,16 +122,35 @@ Read first: DESIGN.md §1a, §7 (`minio-proxy.conf` sketch).
 
 ## Phase 4 — Infrastructure & provisioning (`infrastructure/`)
 Read first: DESIGN.md §7 (compose, config/secrets), §4 (bucket + schema).
-- [ ] Per-tier `docker-compose.yml` (DMZ / App / Data) with `env_file` per service, volumes, and the
-      MinIO webhook env.
-- [ ] MinIO setup script: create `gpsa-ads` (private, no public ACL), lifecycle rule (`pending_`
-      30d), ObjectCreated webhook → API, and a **scoped service account** → `ads-api.env`.
-- [ ] NocoDB provision script: create the base + `Ads` table (fields/enums per §4) → print
-      `NOCODB_BASE_ID` / `NOCODB_ADS_TABLE_ID` for `ads-api.env`.
-- [ ] `generate-secrets.sh` — populate the `S` values across the `.env` files; `chmod 600`.
-- [ ] Optional `mc` bulk-export helper (§7) for the meet director.
+- [x] Per-tier `docker-compose.yml` (DMZ / App / Data) with `env_file` per service, volumes, and the
+      MinIO webhook env (`docker-compose.{dmz,app,data}.yml` + `minio.env.example`, `nocodb.env.example`).
+- [x] MinIO setup script (`minio-setup.sh`): create `gpsa-ads` (private, no public ACL), lifecycle rule
+      (30d), ObjectCreated webhook → API, and a **scoped service account** → `ads-api.env`.
+- [x] NocoDB provision script (`nocodb-setup.sh`): create the base + `Ads` table (fields/enums per §4) →
+      print `NOCODB_BASE_ID` / `NOCODB_ADS_TABLE_ID` (+ token) for `ads-api.env`.
+- [x] `generate-secrets.sh` — populate the `S` values across the `.env` files; `chmod 600`.
+- [x] Optional `mc` bulk-export helper (`export-approved.sh`, §7) for the meet director.
 - **Verify:** `docker compose up` per tier on a test host; the MinIO webhook reaches the API; a
   submit produces a NocoDB row and a `pending_` object.
+  **Done (2026-07-23):** stood up the whole system locally (real images + real `*.env` from
+  `generate-secrets.sh` + the real setup scripts) against live NocoDB (2026.07.0) + MinIO + a Mailpit
+  sink. `nocodb-setup.sh` created the base + `Ads` table (all §4 fields/enums) + an API token;
+  `minio-setup.sh` created the private bucket, subscribed `s3:ObjectCreated:*` → `arn:minio:sqs::ADS:webhook`,
+  added the `state=pending`/30d lifecycle rule, and minted a bucket-scoped service account. A real
+  submit: `POST /api/submit` (test Turnstile) → NocoDB row `AWAITING_UPLOAD` (payment CHECK, $75) +
+  presign signed by the scoped svcacct → upload **through the proxy → 204** → `pending_` object in the
+  bucket → **MinIO ObjectCreated webhook authenticated and reached `/internal/uploaded`** → dims
+  validated (2700×1200 recorded) → Gemini failed on the dummy key → **fail-safe `NEEDS_REVIEW`** →
+  both emails captured in Mailpit (submitter outcome + internal ad-chair notification). The
+  `APPROVED` + `pending_→approved_` rename branch needs a real `GEMINI_API_KEY` (Phase 6 deploy value).
+  **Script hardening from the verify:** `minio-setup.sh` parses the svcacct with grep (mc-only, no
+  python dep); `nocodb-setup.sh` JSON helpers keep the program in `-c` so piped data owns stdin and
+  tolerate non-JSON error bodies.
+
+> **Lifecycle caveat:** keys are `{ad_uuid}/pending_{file}` (not a root prefix), so the 30-day cleanup
+> is a **tag-based** rule (`state=pending`), inert until pending objects carry that tag — a small
+> Ads-API follow-up (tag on upload, drop on the `approved_` rename). Documented in
+> `infrastructure/README.md`; nothing else depends on it.
 
 ## Phase 5 — CI/CD (`.github/workflows/`)
 Read first: DESIGN.md §7; portfolio `../CLAUDE.md` (pinned `node24` action majors).

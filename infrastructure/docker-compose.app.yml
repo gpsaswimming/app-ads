@@ -1,0 +1,14 @@
+# Application tier VM — the Ads API, the ONLY credentialed component (DESIGN.md §3, §7).
+# Makes the outbound calls (Gemini, SMTP). Reached by DMZ nginx (/api/*) and by MinIO's
+# ObjectCreated webhook (/internal/uploaded), across the inter-tier firewall.
+#
+#   cp ../services/ads-api/ads-api.env.example ads-api.env   # fill it, chmod 600
+#   docker compose -f docker-compose.app.yml up -d
+
+services:
+  ads-api:
+    image: ghcr.io/gpsaswimming/app-ads-api:latest
+    restart: unless-stopped
+    env_file: ./ads-api.env
+    ports:
+      - "8080:8080"   # DMZ nginx → /api/*  ·  MinIO webhook → /internal/uploaded

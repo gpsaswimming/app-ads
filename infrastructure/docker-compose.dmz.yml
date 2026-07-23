@@ -1,0 +1,41 @@
+# DMZ tier VM — internet-facing edge (DESIGN.md §1a, §7). Serves the form, fronts the
+# upload-only proxy, and runs MinIO. The two proxies hold zero credentials; MinIO's own
+# credentials never leave this tier. Nothing here reaches NocoDB.
+#
+#   cp web.env.example web.env  proxy.env.example proxy.env  minio.env.example minio.env
+#   # fill them (generate-secrets.sh helps), then:
+#   docker compose -f docker-compose.dmz.yml up -d
+#
+# The edge/tunnel fronts `web` as ads.gpsaswimming.org and `minio-proxy` as
+# ads-upload.gpsaswimming.org. MinIO :9000/:9001 are LAN/App-tier only — NEVER routed
+# to the edge.
+
+services:
+  web:
+    image: ghcr.io/gpsaswimming/app-ads-web:latest
+    restart: unless-stopped
+    env_file: ./web.env
+    ports:
+      - "8080:8080"   # edge → ads.gpsaswimming.org
+
+  minio-proxy:
+    image: ghcr.io/gpsaswimming/app-ads-proxy:latest
+    restart: unless-stopped
+    env_file: ./proxy.env
+    depends_on: [minio]
+    ports:
+      - "8082:8080"   # edge → ads-upload.gpsaswimming.org (POST /gpsa-ads only)
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    env_file: ./minio.env     # root creds + MINIO_SERVER_URL + ObjectCreated webhook target
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"   # S3 — App tier (SDK) + LAN downloads; public ONLY via minio-proxy
+      - "9001:9001"   # console — LAN only; NEVER routed to the edge
+
+volumes:
+  minio_data:
