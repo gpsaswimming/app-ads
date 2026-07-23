@@ -154,10 +154,19 @@ Read first: DESIGN.md §7 (compose, config/secrets), §4 (bucket + schema).
 
 ## Phase 5 — CI/CD (`.github/workflows/`)
 Read first: DESIGN.md §7; portfolio `../CLAUDE.md` (pinned `node24` action majors).
-- [ ] Workflow: on push to `main`, build + push the **3 images** to GHCR as **public** packages
-      (built-in `GITHUB_TOKEN`, `permissions: packages: write`). No app secrets in CI.
-- [ ] Tag `:latest` + commit SHA.
-- **Verify:** a push yields 3 public images pullable with no `docker login`.
+- [x] Workflow (`build-images.yml`): on push to `main`, build + push the **3 images** to GHCR
+      (built-in `GITHUB_TOKEN`, `permissions: packages: write`). No app secrets in CI. Matrix over
+      web/proxy/api; `paths:` filter + `workflow_dispatch`.
+- [x] Tag `:latest` + commit SHA (`docker/metadata-action`).
+- **Verify:** a push yields 3 images pullable with no `docker login`.
+  **Status (2026-07-23):** workflow authored + build contexts confirmed (all three Dockerfiles build;
+  the `docker-compose.build.override.yml` rush path config-validates). The push-to-GHCR + **make each
+  package Public** step completes on merge to `main` (packages default to private on first push — flip
+  visibility once per package, per `infrastructure/LAUNCH.md`).
+
+> **Launch aids added alongside Phase 5:** `infrastructure/docker-compose.build.override.yml` (build
+> the 3 images locally for a one-host rush launch, no registry needed) and `infrastructure/LAUNCH.md`
+> (bring-up runbook + the exact credentials to supply + edge routing + smoke test).
 
 ## Phase 6 — Edge & end-to-end
 Read first: DESIGN.md §7 (domains / traffic model).
