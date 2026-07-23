@@ -37,8 +37,16 @@ export function createMailer({ smtpUrl, from, notifyEmail, checkAddress, transpo
     return PLACEMENT_SPECS[placement]?.label || placement;
   }
 
-  async function send({ to, subject, text }) {
-    return tx.sendMail({ from, to, subject, text });
+  // refId → an X-Entity-Ref-ID header, which tells Gmail to treat each message as its
+  // own conversation instead of threading a run of same-subject emails together.
+  async function send({ to, subject, text, refId }) {
+    return tx.sendMail({
+      from,
+      to,
+      subject,
+      text,
+      ...(refId ? { headers: { 'X-Entity-Ref-ID': refId } } : {}),
+    });
   }
 
   return {
@@ -54,15 +62,15 @@ export function createMailer({ smtpUrl, from, notifyEmail, checkAddress, transpo
           amount,
           paymentInstructions: paymentInstructions(row.Payment_Method, amount, row.Team, checkAddress),
         });
-        return send({ to: row.Submitter_Email, subject: 'Your GPSA scoreboard ad — approved', text });
+        return send({ to: row.Submitter_Email, subject: 'Your GPSA scoreboard ad — approved', text, refId: row.Ad_ID });
       }
       if (row.Status === 'REJECTED') {
         const text = eta.render('rejected', { ...common, reason: row.Validation_Notes || 'artwork did not meet the specification' });
-        return send({ to: row.Submitter_Email, subject: 'Your GPSA scoreboard ad — could not be accepted', text });
+        return send({ to: row.Submitter_Email, subject: 'Your GPSA scoreboard ad — could not be accepted', text, refId: row.Ad_ID });
       }
       // NEEDS_REVIEW
       const text = eta.render('needs-review', common);
-      return send({ to: row.Submitter_Email, subject: 'Your GPSA scoreboard ad — received', text });
+      return send({ to: row.Submitter_Email, subject: 'Your GPSA scoreboard ad — received', text, refId: row.Ad_ID });
     },
 
     /** One-line internal notification to the ad chair (DESIGN.md §9). */
@@ -72,6 +80,7 @@ export function createMailer({ smtpUrl, from, notifyEmail, checkAddress, transpo
         submitter: row.Submitter_Name,
         submitterEmail: row.Submitter_Email,
         company: row.Company_Name,
+        adTitle: row.Ad_Title,
         team: row.Team,
         placementLabel: placementLabel(row.Placement),
         amount: formatMoney(row.Payment_Amount),
@@ -79,7 +88,10 @@ export function createMailer({ smtpUrl, from, notifyEmail, checkAddress, transpo
         adId: row.Ad_ID,
         notes: row.Validation_Notes || '',
       });
-      return send({ to: notifyEmail, subject: `[GPSA Ads] ${row.Status} — ${row.Company_Name}`, text });
+      // Unique per submission (company + title + status) so each is its own thread, and
+      // refId adds the belt-and-suspenders X-Entity-Ref-ID header.
+      const subject = `[GPSA Ads] ${row.Company_Name}: ${row.Ad_Title} — ${row.Status}`;
+      return send({ to: notifyEmail, subject, text, refId: row.Ad_ID });
     },
   };
 }
