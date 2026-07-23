@@ -293,8 +293,8 @@ boundary. Keeping internet egress out of the data tier is worth the extra hop.
 - If `Team` is one of the 18 teams → `Payment_Method = PAY_TEAM` is the **only** option (the
   advertiser pays that team, which remits GPSA's half).
 - If `Team = GPSA` → `Payment_Method ∈ {CHECK, SQUARE_INVOICE}` (paid to GPSA directly).
-- **Pricing (2026 default, carried from the prior season):** `FULL_SCREEN` **$75**, `HALF_SCREEN`
-  **$40**, stored as a `placement → cents` config map so it's adjustable per season. Proceeds
+- **Pricing (2026 rates, raised from $75/$40):** `FULL_SCREEN` **$90**, `HALF_SCREEN`
+  **$50**, stored as a `placement → cents` config map so it's adjustable per season. Proceeds
   split **50/50 GPSA / team** when a team is the affiliation.
 - Square invoicing is a **manual admin action** for MVP (no Square API integration); the method
   just records how the advertiser will be billed.
@@ -592,7 +592,7 @@ so the same image runs in any environment. `S` = secret (harm if leaked), `C` = 
 | `ADS_NOTIFY_EMAIL` | C | Internal "new submission" recipient |
 | `GPSA_CHECK_ADDRESS` | C | Mailing address inserted into the CHECK email |
 | `SUBMISSION_DEADLINE` | C | Form-close / late-reject date |
-| `PRICE_FULL_CENTS` / `PRICE_HALF_CENTS` | C | Per-placement price map (7500 / 4000) |
+| `PRICE_FULL_CENTS` / `PRICE_HALF_CENTS` | C | Per-placement price map (9000 / 5000) |
 
 **Data VM** — `nocodb.env`:
 
@@ -635,7 +635,7 @@ Self-hosted nginx static site in the DMZ. Follows the GPSA tool conventions:
 
 **Intro copy (top of form):** "Ads will scroll on the large scoreboard at the Hampton Virginia
 Aquaplex throughout the day (not during swim events). Proceeds from ad sales are divided 50/50
-between GPSA and your team. **Full-screen $75 · Half-screen $40.**"
+between GPSA and your team. **Full-screen $90 · Half-screen $50.**"
 
 **Form fields, in order:**
 - **Submitter** — name, email, phone (optional).
@@ -643,7 +643,7 @@ between GPSA and your team. **Full-screen $75 · Half-screen $40.**"
   league-level ad), Ad title. A checkbox **"I am the advertiser"** — when checked, hides and
   auto-fills the advertiser contact from the submitter; when unchecked, shows required advertiser
   contact (name, email, phone?).
-- **Ad** — Placement (full-screen $75 / half-screen $40, each with a small diagram + the required
+- **Ad** — Placement (full-screen $90 / half-screen $50, each with a small diagram + the required
   export size), file picker (`accept="image/png,image/jpeg"`), and a link to download the matching
   PowerPoint template.
 - **Payment** — driven by the affiliation: if a **team** is selected, show read-only "Pay your
@@ -706,7 +706,7 @@ into the email template). SMTP config is already listed in §7.
    Ads API image via GHCR. VM sizing/hardware/tier segments left to the implementer (§7).
 5. ~~Download logistics~~ — **DECIDED (2026-07-23):** the **meet director** pulls approved ads on
    the LAN and curates them before the meet; an optional `mc` bulk-export helper is provided (§7).
-6. ~~Pricing~~ — **DECIDED (2026-07-23):** FULL_SCREEN $75, HALF_SCREEN $40 (prior-season rates,
+6. ~~Pricing~~ — **DECIDED (2026-07-23):** FULL_SCREEN $90, HALF_SCREEN $50 (raised from the prior $75/$40 rates,
    as this season's default; config map, editable per season). Payment method by affiliation:
    team ⇒ pay the team; GPSA ⇒ check or Square Invoice. 50/50 GPSA/team split.
 7. ~~Deadline handling~~ — **DECIDED (2026-07-23):** auto-close on a `SUBMISSION_DEADLINE` config
