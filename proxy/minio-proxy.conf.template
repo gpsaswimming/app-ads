@@ -1,0 +1,51 @@
+# app-ads-proxy — the upload-only fence in front of object storage (DESIGN.md §1a, §7).
+#
+# This is the ONLY thing the edge routes to for object storage, and it holds ZERO
+# credentials (§3 inv 2): the browser carries the presigned policy + signature; the
+# proxy just forwards. Exactly one operation is reachable — a presigned POST to the
+# bucket. Every other method/path is refused (§3 inv 3). The console (:9001) and any
+# object GET are never routed here.
+#
+# Rendered at container start: envsubst injects only ${ALLOW_ORIGIN}; nginx's own
+# $-variables ($request_method, $host, …) are left untouched. MinIO is a fixed,
+# co-located DMZ service (minio:9000) per the §7 single-stack model, so it's baked in.
+
+server {
+    listen       8080;
+    server_name  _;
+
+    # The one public operation: a presigned POST upload to the gpsa-ads bucket.
+    # (MinIO S3 POST-object targets the bucket path; the object key rides in the
+    # multipart form, not the URL — so the path is exactly /gpsa-ads.)
+    location = /gpsa-ads {
+        # CORS preflight, answered here so object storage stays CORS-dumb (§1a).
+        # The upload host is a different subdomain from the form, so the browser
+        # preflights the cross-origin POST.
+        if ($request_method = OPTIONS) {
+            add_header Access-Control-Allow-Origin  "${ALLOW_ORIGIN}" always;
+            add_header Access-Control-Allow-Methods "POST, OPTIONS" always;
+            add_header Access-Control-Allow-Headers "Content-Type" always;
+            add_header Access-Control-Max-Age       86400 always;
+            add_header Content-Length 0;
+            return 204;
+        }
+
+        # Upload only — any other method (GET/PUT/DELETE/HEAD/…) is rejected.
+        if ($request_method != POST) {
+            return 405;
+        }
+
+        # So the browser's XHR can read the upload result.
+        add_header Access-Control-Allow-Origin "${ALLOW_ORIGIN}" always;
+
+        client_max_body_size 50m;                 # matches the presign content-length cap
+        proxy_set_header Host      $host;          # preserve host → presign signature validates
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_pass http://minio:9000;
+    }
+
+    # Nothing else is reachable — not the console, not object reads, nothing (§1a).
+    location / {
+        return 403;
+    }
+}
