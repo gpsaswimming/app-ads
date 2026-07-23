@@ -1,0 +1,15 @@
+Hi <%= it.name %>,
+
+Your GPSA scoreboard ad has been received and approved.
+
+  Ad:        <%= it.adTitle %>
+  Placement: <%= it.placementLabel %>
+  Amount due: <%= it.amount %>
+
+<%= it.paymentInstructions %>
+
+Your ad ID is <%= it.adId %>. Keep this for your records.
+
+Thank you for supporting GPSA!
+
+— GPSA Scoreboard Ads

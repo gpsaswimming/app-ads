@@ -1,0 +1,11 @@
+New scoreboard ad submission — <%= it.status %>
+
+  Submitter: <%= it.submitter %> <<%= it.submitterEmail %>>
+  Company:   <%= it.company %>
+  Team:      <%= it.team %>
+  Placement: <%= it.placementLabel %>
+  Amount:    <%= it.amount %>
+  Payment:   <%= it.paymentMethod %>
+  Ad ID:     <%= it.adId %>
+<% if (it.notes) { %>  Notes:     <%= it.notes %>
+<% } %>

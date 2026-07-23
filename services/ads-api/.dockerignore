@@ -1,0 +1,8 @@
+node_modules
+npm-debug.log*
+test
+*.env
+!*.env.example
+.git
+.DS_Store
+docker-compose.dev.yml

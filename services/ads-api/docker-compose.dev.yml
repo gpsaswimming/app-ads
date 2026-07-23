@@ -1,0 +1,35 @@
+# Local development for the Ads API only (Phase 1). Full end-to-end (MinIO + NocoDB)
+# comes with the infrastructure stacks in Phase 4; this brings up the API with live
+# reload plus a Mailpit sink so outcome emails are observable in a browser.
+#
+#   cp ads-api.env.example ads-api.env   # fill placeholders (real MinIO/NocoDB not
+#                                        # required to boot or to hit /health)
+#   docker compose -f docker-compose.dev.yml up --build
+#
+# API → http://localhost:8080/health   ·   Mailpit UI → http://localhost:8025
+
+services:
+  ads-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["node", "--watch", "src/server.js"]
+    environment:
+      NODE_ENV: development
+      # Point email at the local Mailpit sink regardless of what ads-api.env holds.
+      SMTP_URL: smtp://mailpit:1025
+    env_file:
+      - ads-api.env
+    volumes:
+      # Live-reload source; keep the image's node_modules.
+      - ./src:/app/src:ro
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mailpit
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025" # web UI
+      - "1025:1025" # SMTP

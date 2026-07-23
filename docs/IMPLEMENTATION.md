@@ -34,32 +34,36 @@ go** so a fresh session can resume exactly where the last left off.
 
 ## Phase 1 — Ads API (`services/ads-api` → image `app-ads-api`) — everything depends on this
 Read first: DESIGN.md §2 (flow), §3 (invariants), §4 (data model), §5 (validation), §9 (emails).
-- [ ] Fastify skeleton + `GET /health`; Dockerfile (node:alpine, non-root, healthcheck);
+- [x] Fastify skeleton + `GET /health`; Dockerfile (node:alpine, non-root, healthcheck);
       `docker-compose.dev.yml` with `node --watch`.
-- [ ] Config loader — read + validate all §7 env vars at boot; **fail fast** if any required one is missing.
-- [ ] NocoDB client — REST via base/table IDs; **parameterized filters**; create/update `Ads` rows.
-- [ ] MinIO clients — internal SDK (renames) + presign client bound to the **public** upload host.
-- [ ] `POST /api/submit`:
-  - [ ] deadline check first → `403 SUBMISSIONS_CLOSED`
-  - [ ] Turnstile `siteverify` → `403` on fail (nothing created)
-  - [ ] JSON-schema validation (`additionalProperties:false`): `rights_confirmed===true`,
+- [x] Config loader — read + validate all §7 env vars at boot; **fail fast** if any required one is missing.
+- [x] NocoDB client — REST via base/table IDs; **parameterized filters**; create/update `Ads` rows.
+- [x] MinIO clients — internal SDK (renames) + presign client bound to the **public** upload host.
+- [x] `POST /api/submit`:
+  - [x] deadline check first → `403 SUBMISSIONS_CLOSED`
+  - [x] Turnstile `siteverify` → `403` on fail (nothing created)
+  - [x] JSON-schema validation (`additionalProperties:false`): `rights_confirmed===true`,
         `placement` enum, `payment_method` valid for affiliation, `content_type`/`byte_size`,
         and (if `submitter_is_advertiser`) `advertiser_*` == `submitter_*`
-  - [ ] create `Ads` row (`Ad_ID` UUID, `AWAITING_UPLOAD`); set `Payment_Amount` from `placement`
-  - [ ] generate presigned POST (bucket + `pending_` prefix + `content-length-range` + content-type)
+  - [x] create `Ads` row (`Ad_ID` UUID, `AWAITING_UPLOAD`); set `Payment_Amount` from `placement`
+  - [x] generate presigned POST (bucket + `pending_` prefix + `content-length-range` + content-type)
         → return `{ ad_id, presign }`
-- [ ] `POST /internal/uploaded` (shared-secret header `MINIO_TO_API_SECRET`):
-  - [ ] ignore keys without `pending_`
-  - [ ] `VALIDATING`; record `Artwork_URI`/`Bytes`/`Content_Type`
-  - [ ] `sharp` dimension check vs `placement` (aspect ±1%, min dims) → `REJECTED` on fail
-  - [ ] Gemini appropriateness (flag offensive/adult + not-an-ad) → `NEEDS_REVIEW`; **fail-safe**
+- [x] `POST /internal/uploaded` (shared-secret header `MINIO_TO_API_SECRET`):
+  - [x] ignore keys without `pending_`
+  - [x] `VALIDATING`; record `Artwork_URI`/`Bytes`/`Content_Type`
+  - [x] `sharp` dimension check vs `placement` (aspect ±1%, min dims) → `REJECTED` on fail
+  - [x] Gemini appropriateness (flag offensive/adult + not-an-ad) → `NEEDS_REVIEW`; **fail-safe**
         to `NEEDS_REVIEW` on error/timeout
-  - [ ] on pass: rename `pending_`→`approved_`, status `APPROVED`
-  - [ ] send outcome email (submitter) + internal notification (`ADS_NOTIFY_EMAIL`)
-- [ ] Email — nodemailer + Eta (auto-escaped): approved (amount + payment instructions by method),
+  - [x] on pass: rename `pending_`→`approved_`, status `APPROVED`
+  - [x] send outcome email (submitter) + internal notification (`ADS_NOTIFY_EMAIL`)
+- [x] Email — nodemailer + Eta (auto-escaped): approved (amount + payment instructions by method),
       rejected (reason), needs-review; internal one-line summary.
 - **Verify:** unit-test submit/validate handlers; `curl /health`; a submit call returns a presign;
   simulate an `/internal/uploaded` event → correct status transitions + email captured (mailcatcher).
+  **Done (2026-07-23):** 40 unit/integration tests pass (`npm test`) covering submit/validate +
+  the full `/internal/uploaded` state machine with a fake mailer capturing outcome + internal
+  emails; real server boots + `curl /health` → 200; the real MinIO client signs a presigned POST to
+  `ads-upload.gpsaswimming.org/gpsa-ads`. Live MinIO/NocoDB/SMTP wiring lands with Phase 4 infra.
 
 ## Phase 2 — Web frontend (`web/` → image `app-ads-web`)
 Read first: DESIGN.md §8 (form), §2 (flow), §1a (upload).
