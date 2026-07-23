@@ -2,6 +2,7 @@ New scoreboard ad submission — <%= it.status %>
 
   Submitter: <%= it.submitter %> <<%= it.submitterEmail %>>
   Company:   <%= it.company %>
+  Ad title:  <%= it.adTitle %>
   Team:      <%= it.team %>
   Placement: <%= it.placementLabel %>
   Amount:    <%= it.amount %>
