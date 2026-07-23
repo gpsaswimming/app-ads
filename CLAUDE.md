@@ -46,8 +46,9 @@ MinIO's own ports are never directly internet-exposed. The DMZ proxies hold zero
   403/405). minio-proxy holds zero creds, sets CORS for the form origin, preserves `Host`.
 - **Internal (App):** Ads API SDK → MinIO :9000 (presign-target host + `pending_`→`approved_` rename).
 - **LAN only:** you / scoreboard operator → MinIO :9000/:9001 for downloads + console. **No
-  public GET path.** Presign is generated against the public upload host; MinIO started with
-  `MINIO_SERVER_URL=https://ads-upload.gpsaswimming.org` so signatures validate.
+  public GET path.** Presign is generated against the public upload host; MinIO's own
+  `MINIO_SERVER_URL` is the **LAN** API address (presigned-POST is host-independent, and the
+  fenced public host breaks the Console login).
 
 Flow: same-origin `POST /api/submit` (nginx→API) verifies Turnstile + validates + writes NocoDB
 row + returns a presigned POST → browser uploads photo to `ads-upload.gpsaswimming.org`

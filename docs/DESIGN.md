@@ -121,8 +121,9 @@ A full compromise of the DMZ yields no credentials and no direct database or sto
   edge routes to for object storage. It exposes exactly one verb+path and holds **zero
   credentials** (the browser carries the presigned policy + signature; the proxy just forwards).
 - **Signing host:** the Ads API generates the presign against the **public upload host**
-  (`https://ads-upload.gpsaswimming.org`); the proxy **preserves the `Host` header**; MinIO is
-  started with `MINIO_SERVER_URL=https://ads-upload.gpsaswimming.org` so the signature validates.
+  (`https://ads-upload.gpsaswimming.org`); the proxy **preserves the `Host` header**. A presigned
+  POST signature is **host-independent**, so MinIO's own `MINIO_SERVER_URL` is set to its **LAN**
+  API address — using the fenced public host is unnecessary and **breaks the Console login**.
   The API's internal SDK client (renames) uses the internal host and is unaffected.
 - **CORS** is answered by the proxy (the upload host is a different subdomain from the form):
   `Allow-Origin: https://ads.gpsaswimming.org`, `Allow-Methods: POST, OPTIONS`. Object storage
@@ -472,7 +473,7 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-      MINIO_SERVER_URL: https://ads-upload.gpsaswimming.org   # so presign signatures validate
+      MINIO_SERVER_URL: http://minio.lan:9000   # LAN API address — NOT the public host (that breaks the console)
       MINIO_NOTIFY_WEBHOOK_ENABLE_ADS: "on"
       MINIO_NOTIFY_WEBHOOK_ENDPOINT_ADS: "http://ads-api.gpsa.local:8080/internal/uploaded"
       MINIO_NOTIFY_WEBHOOK_AUTH_TOKEN_ADS: ${MINIO_TO_API_SECRET}
@@ -570,7 +571,7 @@ so the same image runs in any environment. `S` = secret (harm if leaked), `C` = 
 |---|---|---|---|
 | `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` | S | minio | Admin bootstrap (not used by the app) |
 | `MINIO_TO_API_SECRET` | S | minio | Auth header on the ObjectCreated webhook (**shared** — see below) |
-| `MINIO_SERVER_URL` | C | minio | Public upload host, so presign signatures validate |
+| `MINIO_SERVER_URL` | C | minio | MinIO's LAN API address (NOT the public host — presigned POST is host-independent; the public host breaks the console) |
 | `MINIO_NOTIFY_WEBHOOK_ENDPOINT_ADS` | C | minio | The API's `/internal/uploaded` URL |
 | `TURNSTILE_SITE_KEY` | C | web | Public Turnstile key, injected into the form |
 | `UPLOAD_URL` | C | web | Upload host the browser POSTs to |
