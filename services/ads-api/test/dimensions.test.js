@@ -34,10 +34,12 @@ test('rejects wrong aspect ratio', async () => {
   assert.match(res.reason, /aspect/);
 });
 
-test('rejects below-minimum dimensions at the right aspect', async () => {
-  const res = await validateDimensions(await png(900, 400), 'FULL_SCREEN', 'image/png');
-  assert.equal(res.ok, false);
-  assert.match(res.reason, /minimum/);
+test('accepts a low-res image at the right ratio (resolution not enforced)', async () => {
+  // 900×400 = 9:4, and 864×768 = 9:8 (last year's half-screen size) — both accepted.
+  const full = await validateDimensions(await png(900, 400), 'FULL_SCREEN', 'image/png');
+  assert.equal(full.ok, true, full.reason || '');
+  const half = await validateDimensions(await png(864, 768), 'HALF_SCREEN', 'image/png');
+  assert.equal(half.ok, true, half.reason || '');
 });
 
 test('rejects an unsupported content type', async () => {
