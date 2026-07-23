@@ -15,8 +15,12 @@ const PROMPT = [
   'problem.',
   '(b) It is a real scoreboard ad or a genuine recognition/congrats message — not blank, a',
   'random screenshot, or unrelated content with no message at all.',
-  '(c) It has a black or very dark background. The board requires dark backgrounds with',
-  'light text — flag any image whose background is white or predominantly light or bright.',
+  '(c) It is not mostly white or washed-out. Large areas of white or near-white can damage',
+  'the LED board, so flag artwork whose background is white or light-gray, or that is',
+  'predominantly white — for example a white logo, or a logo placed on a plain white',
+  'background. A full-color photograph is fine even when it is bright or shot outdoors;',
+  'only flag images DOMINATED by white or very light tones, not images that are merely',
+  '"not dark".',
   'Respond JSON {appropriate: boolean, reason: string}; keep reason short and specific.',
 ].join(' ');
 
