@@ -15,8 +15,13 @@ server {
 
     # Same-origin API. nginx proxies across the inter-tier firewall to the App tier.
     # Cleartext HTTP between tiers by design (§3 inv 11) — TLS terminates at the edge.
+    # The upstream is resolved LAZILY (variable proxy_pass + resolver) so the static form
+    # still boots and serves even when the API tier is down or its DNS isn't up yet — a
+    # public form must not fail to load because the backend is momentarily unreachable.
     location /api/ {
-        proxy_pass         http://${API_UPSTREAM};
+        resolver           ${RESOLVER} valid=10s ipv6=off;
+        set $ads_upstream  ${API_UPSTREAM};
+        proxy_pass         http://$ads_upstream;
         proxy_http_version 1.1;
         proxy_set_header   Host              $host;
         proxy_set_header   X-Real-IP         $remote_addr;
