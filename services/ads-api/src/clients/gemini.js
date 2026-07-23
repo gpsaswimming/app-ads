@@ -4,12 +4,20 @@
 // and returns a structured verdict, throwing on transport/parse failure.
 
 const PROMPT = [
-  'You are screening an image submitted as a paid advertisement to display on a',
-  'scoreboard at a family youth swim meet. Flag it if EITHER: (a) it contains',
-  'offensive or adult content — profanity, nudity, sexual content, graphic violence,',
-  'hate, or anything not family-friendly; OR (b) it is clearly not an advertisement —',
-  'e.g. blank, a personal photo, a screenshot, or unrelated content. Do not consider',
-  'anything else. Respond JSON {appropriate: boolean, reason: string}.',
+  'You are screening an image submitted as a paid advertisement to be shown on a large',
+  'LED scoreboard at a family youth swim meet. Ads may be business/sponsor promotions OR',
+  'personal and team recognition messages — e.g. a parent congratulating a swimmer',
+  '("Congrats Emma!") or a team celebrating its athletes — and these often include a photo',
+  'of the swimmer, which is expected and completely fine. Set appropriate=false only if ANY',
+  'of these fail, and name the failing check in `reason`:',
+  '(a) Family-friendly: no profanity, nudity, sexual content, graphic violence, hate, or',
+  'other content unsuitable for children. An ordinary photo of a child swimmer is NOT a',
+  'problem.',
+  '(b) It is a real scoreboard ad or a genuine recognition/congrats message — not blank, a',
+  'random screenshot, or unrelated content with no message at all.',
+  '(c) It has a black or very dark background. The board requires dark backgrounds with',
+  'light text — flag any image whose background is white or predominantly light or bright.',
+  'Respond JSON {appropriate: boolean, reason: string}; keep reason short and specific.',
 ].join(' ');
 
 const RESPONSE_SCHEMA = {
