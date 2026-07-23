@@ -336,6 +336,54 @@
   }
 
   // ---- Init ----
+  // ---- Artwork drop-zone (click or drag-and-drop) ----
+  function formatBytes(b) {
+    if (b < 1024) return `${b} B`;
+    if (b < 1048576) return `${(b / 1024).toFixed(1)} KB`;
+    return `${(b / 1048576).toFixed(1)} MB`;
+  }
+  function setFileSelected(file) {
+    const dz = $('dropzone');
+    dz.classList.add('has-file');
+    dz.querySelector('.dz-icon-empty').classList.add('hidden');
+    dz.querySelector('.dz-icon-selected').classList.remove('hidden');
+    $('dz-prompt').innerHTML = '<strong>Artwork attached</strong> — click to choose a different file';
+    $('dz-name').textContent = `${file.name} (${formatBytes(file.size)})`; // textContent — escapes the filename
+  }
+  function setFileEmpty() {
+    const dz = $('dropzone');
+    dz.classList.remove('has-file');
+    dz.querySelector('.dz-icon-selected').classList.add('hidden');
+    dz.querySelector('.dz-icon-empty').classList.remove('hidden');
+    $('dz-prompt').innerHTML = '<strong>Click to choose your artwork</strong> or drag it here';
+    $('dz-name').textContent = 'Full-color PNG or JPG, up to 50 MB';
+  }
+  function wireDropzone() {
+    const dz = $('dropzone');
+    const input = $('artwork');
+    if (!dz || !input) return;
+    input.addEventListener('change', () => {
+      const f = input.files[0];
+      if (f) setFileSelected(f); else setFileEmpty();
+    });
+    ['dragenter', 'dragover'].forEach((ev) => dz.addEventListener(ev, (e) => {
+      e.preventDefault(); dz.classList.add('dragover');
+    }));
+    ['dragleave', 'dragend'].forEach((ev) => dz.addEventListener(ev, (e) => {
+      e.preventDefault(); dz.classList.remove('dragover');
+    }));
+    dz.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dz.classList.remove('dragover');
+      const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (!f) return;
+      const dt = new DataTransfer();
+      dt.items.add(f);
+      input.files = dt.files; // populate the real input so submit/validation see it
+      input.dispatchEvent(new Event('change'));
+    });
+  }
+
   // Publish the deadline in the hero (reads the same injected value isClosed() uses).
   function renderDeadline() {
     const el = $('deadline-line');
@@ -361,6 +409,7 @@
       el.addEventListener('change', () => { updatePlacementCards(); updatePayment(); });
     });
     $('ad-form').addEventListener('submit', handleSubmit);
+    wireDropzone();
 
     updateAdvertiserVisibility();
     updatePayment();

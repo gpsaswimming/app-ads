@@ -184,9 +184,15 @@
                 </div>
 
                 <div class="field">
-                    <label for="artwork">Artwork file <span class="req">*</span></label>
-                    <input type="file" id="artwork" name="artwork" accept="image/png,image/jpeg" required>
-                    <p class="hint">Full-color PNG or JPG, up to 50&nbsp;MB. The exact size &amp; aspect are checked after upload.</p>
+                    <span class="legend-label">Artwork file <span class="req">*</span></span>
+                    <label id="dropzone" for="artwork" class="dropzone">
+                        <svg class="dz-icon dz-icon-empty" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 0L8 8m4-4 4 4M4 15v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+                        <svg class="dz-icon dz-icon-selected hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <p class="dz-prompt" id="dz-prompt"><strong>Click to choose your artwork</strong> or drag it here</p>
+                        <p class="dz-name" id="dz-name">Full-color PNG or JPG, up to 50&nbsp;MB</p>
+                        <input type="file" id="artwork" name="artwork" accept="image/png,image/jpeg" required class="sr-only">
+                    </label>
+                    <p class="hint">The exact size &amp; aspect are checked after upload.</p>
                 </div>
 
                 <div class="tips">
