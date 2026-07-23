@@ -82,10 +82,12 @@ export function makeUploadedHandler(ctx) {
     // Gemini appropriateness — advisory; ANY error/timeout → NEEDS_REVIEW (fail safe).
     let appropriate = false;
     let reason = 'Flagged for human review';
+    let aiSummary = '';
     try {
       const verdict = await checkAppropriateness(buffer, effectiveContentType);
       appropriate = verdict.appropriate;
       reason = verdict.reason || reason;
+      aiSummary = verdict.summary || '';
     } catch (err) {
       appropriate = false;
       reason = 'Appropriateness check unavailable — routed for human review';
@@ -103,7 +105,7 @@ export function makeUploadedHandler(ctx) {
       await noco.updateAd(row.Id, update);
       Object.assign(row, update);
       await mailer.sendOutcome(row);
-      await mailer.sendInternal(row);
+      await mailer.sendInternal(row, { aiSummary });
       log.info({ adId }, 'ad approved');
       return;
     }
@@ -117,7 +119,7 @@ export function makeUploadedHandler(ctx) {
     await noco.updateAd(row.Id, update);
     Object.assign(row, update);
     await mailer.sendOutcome(row);
-    await mailer.sendInternal(row);
+    await mailer.sendInternal(row, { aiSummary });
     log.info({ adId, reason }, 'ad routed to NEEDS_REVIEW');
   }
 
