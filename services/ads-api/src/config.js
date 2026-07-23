@@ -107,7 +107,7 @@ export function loadConfig(env = process.env) {
       apiKey: env.GEMINI_API_KEY,
       // Current Gemini Flash tier (DESIGN.md §5); config-overridable so the exact
       // model id can be confirmed/rotated at deploy without a code change.
-      model: env.GEMINI_MODEL || 'gemini-2.5-flash',
+      model: env.GEMINI_MODEL || 'gemini-flash-latest',
       timeoutMs: geminiTimeoutMs,
     }),
 
