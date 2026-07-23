@@ -1,0 +1,122 @@
+# Implementation Plan — app-ads
+
+Sequenced build plan for the GPSA Scoreboard Ads platform. **The design is APPROVED** (2026-07-23,
+see [`DESIGN.md`](DESIGN.md)). Build **one step at a time**; each step lists what to do, the files
+it touches, which DESIGN.md sections to read first, and how to verify it. **Check off `[x]` as you
+go** so a fresh session can resume exactly where the last left off.
+
+> This repo is **public** — keep all docs and code self-contained; no references to other/private
+> systems. Follow the parent portfolio conventions in `../CLAUDE.md` (shared CSS/assets CDN, brand
+> colors, Inter, `node24` action majors for CI).
+
+## Golden rules while building (DESIGN.md §3)
+
+- **The Ads API is the only credentialed component.** The DMZ (web, upload proxy) holds **zero**
+  secrets.
+- **Images are secret-free and environment-agnostic.** Every secret/config value is injected at
+  runtime via a per-service `.env` (§7); nothing is baked into an image or handed to CI.
+- **Escape user input at every boundary** — parameterized NocoDB filters (no string interpolation),
+  auto-escaped email templates (Eta `<%= %>`), `textContent`/`escapeHtml()` in the browser (never
+  `innerHTML`).
+- **Object keys are built server-side from the `Ad_ID` UUID**; size/type are enforced by the
+  presign policy, not the client.
+- **Verify Turnstile server-side before creating anything.**
+
+---
+
+## Phase 0 — Repo scaffold
+- [ ] Create the structure: `web/`, `proxy/`, `services/ads-api/`, `infrastructure/`,
+      `.github/workflows/`, `docs/` (this file + `DESIGN.md`).
+- [ ] `.gitignore` — ignore `*.env` (keep `*.env.example`), `node_modules`, build output.
+- [ ] `README.md` — one-paragraph overview + links to `docs/DESIGN.md` and this plan.
+- [ ] Per-service `*.env.example` listing **every** key from DESIGN.md §7 with placeholder values.
+- **Verify:** tree matches the layout in `CLAUDE.md`; `git status` shows no real `.env` tracked.
+
+## Phase 1 — Ads API (`services/ads-api` → image `app-ads-api`) — everything depends on this
+Read first: DESIGN.md §2 (flow), §3 (invariants), §4 (data model), §5 (validation), §9 (emails).
+- [ ] Fastify skeleton + `GET /health`; Dockerfile (node:alpine, non-root, healthcheck);
+      `docker-compose.dev.yml` with `node --watch`.
+- [ ] Config loader — read + validate all §7 env vars at boot; **fail fast** if any required one is missing.
+- [ ] NocoDB client — REST via base/table IDs; **parameterized filters**; create/update `Ads` rows.
+- [ ] MinIO clients — internal SDK (renames) + presign client bound to the **public** upload host.
+- [ ] `POST /api/submit`:
+  - [ ] deadline check first → `403 SUBMISSIONS_CLOSED`
+  - [ ] Turnstile `siteverify` → `403` on fail (nothing created)
+  - [ ] JSON-schema validation (`additionalProperties:false`): `rights_confirmed===true`,
+        `placement` enum, `payment_method` valid for affiliation, `content_type`/`byte_size`,
+        and (if `submitter_is_advertiser`) `advertiser_*` == `submitter_*`
+  - [ ] create `Ads` row (`Ad_ID` UUID, `AWAITING_UPLOAD`); set `Payment_Amount` from `placement`
+  - [ ] generate presigned POST (bucket + `pending_` prefix + `content-length-range` + content-type)
+        → return `{ ad_id, presign }`
+- [ ] `POST /internal/uploaded` (shared-secret header `MINIO_TO_API_SECRET`):
+  - [ ] ignore keys without `pending_`
+  - [ ] `VALIDATING`; record `Artwork_URI`/`Bytes`/`Content_Type`
+  - [ ] `sharp` dimension check vs `placement` (aspect ±1%, min dims) → `REJECTED` on fail
+  - [ ] Gemini appropriateness (flag offensive/adult + not-an-ad) → `NEEDS_REVIEW`; **fail-safe**
+        to `NEEDS_REVIEW` on error/timeout
+  - [ ] on pass: rename `pending_`→`approved_`, status `APPROVED`
+  - [ ] send outcome email (submitter) + internal notification (`ADS_NOTIFY_EMAIL`)
+- [ ] Email — nodemailer + Eta (auto-escaped): approved (amount + payment instructions by method),
+      rejected (reason), needs-review; internal one-line summary.
+- **Verify:** unit-test submit/validate handlers; `curl /health`; a submit call returns a presign;
+  simulate an `/internal/uploaded` event → correct status transitions + email captured (mailcatcher).
+
+## Phase 2 — Web frontend (`web/` → image `app-ads-web`)
+Read first: DESIGN.md §8 (form), §2 (flow), §1a (upload).
+- [ ] `public/` static form per §8 field order; shared GPSA CSS + Inter; brand colors;
+      `max-w-7xl mx-auto`, `showToast()`, `escapeHtml()`.
+- [ ] Intro copy (venue + 50/50 split + pricing) verbatim; per-placement template download links.
+- [ ] Behavior: "I am the advertiser" auto-fill; placement→price display; payment method by
+      affiliation (team ⇒ read-only "pay your team"; GPSA ⇒ Check/Square Invoice); required rights
+      checkbox; Turnstile widget.
+- [ ] Two-step submit: POST metadata → `/api/submit`; on `{presign}` do the direct multipart POST
+      to `UPLOAD_URL`; progress → success (Ad_ID + amount + how to pay).
+- [ ] Deadline-closed state.
+- [ ] `nginx.conf` — serve static + reverse-proxy `/api/*` to the API host.
+- [ ] Entrypoint `envsubst` injects `TURNSTILE_SITE_KEY` + `UPLOAD_URL` into a `config.js` at start;
+      Dockerfile.
+- **Verify:** run the web image against the dev API; submit a real test ad end-to-end.
+
+## Phase 3 — Upload proxy (`proxy/` → image `app-ads-proxy`)
+Read first: DESIGN.md §1a, §7 (`minio-proxy.conf` sketch).
+- [ ] `minio-proxy.conf` — `POST /gpsa-ads` only (405 other methods, 403 everything else), CORS for
+      `ALLOW_ORIGIN`, `proxy_set_header Host $host`, `client_max_body_size 50m`.
+- [ ] Entrypoint `envsubst` `ALLOW_ORIGIN`; Dockerfile.
+- **Verify:** a POST through the proxy lands in MinIO; GET/other methods → 403/405; console
+  unreachable via the proxy.
+
+## Phase 4 — Infrastructure & provisioning (`infrastructure/`)
+Read first: DESIGN.md §7 (compose, config/secrets), §4 (bucket + schema).
+- [ ] Per-tier `docker-compose.yml` (DMZ / App / Data) with `env_file` per service, volumes, and the
+      MinIO webhook env.
+- [ ] MinIO setup script: create `gpsa-ads` (private, no public ACL), lifecycle rule (`pending_`
+      30d), ObjectCreated webhook → API, and a **scoped service account** → `ads-api.env`.
+- [ ] NocoDB provision script: create the base + `Ads` table (fields/enums per §4) → print
+      `NOCODB_BASE_ID` / `NOCODB_ADS_TABLE_ID` for `ads-api.env`.
+- [ ] `generate-secrets.sh` — populate the `S` values across the `.env` files; `chmod 600`.
+- [ ] Optional `mc` bulk-export helper (§7) for the meet director.
+- **Verify:** `docker compose up` per tier on a test host; the MinIO webhook reaches the API; a
+  submit produces a NocoDB row and a `pending_` object.
+
+## Phase 5 — CI/CD (`.github/workflows/`)
+Read first: DESIGN.md §7; portfolio `../CLAUDE.md` (pinned `node24` action majors).
+- [ ] Workflow: on push to `main`, build + push the **3 images** to GHCR as **public** packages
+      (built-in `GITHUB_TOKEN`, `permissions: packages: write`). No app secrets in CI.
+- [ ] Tag `:latest` + commit SHA.
+- **Verify:** a push yields 3 public images pullable with no `docker login`.
+
+## Phase 6 — Edge & end-to-end
+Read first: DESIGN.md §7 (domains / traffic model).
+- [ ] Operator wires edge routing: `ads.gpsaswimming.org` → web; `ads-upload.gpsaswimming.org` →
+      proxy; MinIO/NocoDB/`/internal/*` kept off the public edge; inter-tier firewall per the §7
+      traffic model.
+- [ ] Supply deploy-time values (§10): `SUBMISSION_DEADLINE`, `ADS_NOTIFY_EMAIL`, GPSA check mailing
+      address, and the Turnstile/Gemini/SMTP credentials.
+- [ ] Production smoke test: submit → validate → email → `approved_` object in bucket → meet
+      director LAN download.
+
+---
+
+## Deferred (do NOT build now) — DESIGN.md §12
+- Meet-selection dropdown (2027+). The `Ads.Meet` field already exists; leave it config-set for the
+  single 2026 City Meet.
