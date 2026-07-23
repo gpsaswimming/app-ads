@@ -21,7 +21,11 @@ const PROMPT = [
   'background. A full-color photograph is fine even when it is bright or shot outdoors;',
   'only flag images DOMINATED by white or very light tones, not images that are merely',
   '"not dark".',
-  'Respond JSON {appropriate: boolean, reason: string}; keep reason short and specific.',
+  'ALWAYS also fill `summary`: 2-3 sentences of context for the human ad reviewer —',
+  'describe what the ad shows (its subject and any people), transcribe the main text/',
+  'message, note the dominant colors and background, and call out anything the reviewer',
+  'should double-check. Write the summary even when appropriate is true; keep `reason`',
+  'short. Respond JSON {appropriate: boolean, reason: string, summary: string}.',
 ].join(' ');
 
 const RESPONSE_SCHEMA = {
@@ -29,8 +33,9 @@ const RESPONSE_SCHEMA = {
   properties: {
     appropriate: { type: 'boolean' },
     reason: { type: 'string' },
+    summary: { type: 'string' },
   },
-  required: ['appropriate', 'reason'],
+  required: ['appropriate', 'reason', 'summary'],
 };
 
 export function createGeminiChecker({ apiKey, model, timeoutMs = 15000, fetchImpl = fetch }) {
@@ -76,6 +81,7 @@ export function createGeminiChecker({ apiKey, model, timeoutMs = 15000, fetchImp
       return {
         appropriate: parsed.appropriate === true,
         reason: typeof parsed.reason === 'string' ? parsed.reason : '',
+        summary: typeof parsed.summary === 'string' ? parsed.summary : '',
       };
     } finally {
       clearTimeout(timer);

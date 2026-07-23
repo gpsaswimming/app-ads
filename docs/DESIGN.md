@@ -245,10 +245,11 @@ boundary. Keeping internet egress out of the data tier is worth the extra hop.
    outbound internet calls by design. (Firewall enforcement of this is the operator's call; the
    architecture simply doesn't route data-tier traffic outward.)
 10. **Escape user input at every boundary.** DB `where` clauses → parameterized filter helpers
-    (no string interpolation); email → auto-escaping templates (Eta `<%= %>`), never `<%~ %>` or
-    concatenation; browser rendering of submitter/company text → `textContent`/`escapeHtml()`,
-    never `innerHTML`. A value safe today may be unsafe tomorrow — escaping is structural, not
-    conditional on current content.
+    (no string interpolation); browser rendering of submitter/company text →
+    `textContent`/`escapeHtml()`, never `innerHTML`. Emails are **text/plain**, so there is no
+    markup to escape — HTML-escaping them would corrupt the visible body (turning quotes/`&` into
+    `&quot;`), and the only injection vector, the headers, is handled by nodemailer. A value safe
+    today may be unsafe tomorrow — escaping is structural, not conditional on current content.
 11. **Cleartext internal HTTP between tiers** so the inter-tier firewall can perform full DPI on
     inter-tier calls. TLS terminates at the edge only.
 12. **The `gpsa-ads` bucket is fully private** (no public ACL).
