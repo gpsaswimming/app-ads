@@ -1,0 +1,55 @@
+# Build + push the three custom images to GHCR on every push to main (DESIGN.md §7).
+# No app secrets in CI — the build rides the automatic GITHUB_TOKEN. Images are meant to
+# be PUBLIC packages so the VMs pull with no `docker login` (make each package public once
+# in its GHCR settings after the first push).
+name: build-images
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - 'proxy/**'
+      - 'services/ads-api/**'
+      - '.github/workflows/build-images.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: app-ads-web
+            context: ./web
+          - name: app-ads-proxy
+            context: ./proxy
+          - name: app-ads-api
+            context: ./services/ads-api
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}
+          tags: |
+            type=raw,value=latest
+            type=sha
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

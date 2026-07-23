@@ -1,0 +1,14 @@
+# Build the 3 custom images locally instead of pulling from GHCR — for a rush launch on
+# a single host, or before the GHCR packages are made public. Layer it over any tier file:
+#
+#   docker compose -f docker-compose.dmz.yml -f docker-compose.build.override.yml up -d --build
+#   docker compose -f docker-compose.app.yml -f docker-compose.build.override.yml up -d --build
+#
+# Compose ignores services not present in a given tier file, so the same override works for all.
+services:
+  web:
+    build: ../web
+  minio-proxy:
+    build: ../proxy
+  ads-api:
+    build: ../services/ads-api
