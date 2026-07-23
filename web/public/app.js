@@ -15,7 +15,7 @@
   'use strict';
 
   const CONFIG = window.GPSA_ADS_CONFIG || {};
-  const PRICING = { FULL_SCREEN: 75, HALF_SCREEN: 40 }; // display only; API is authoritative
+  const PRICING = { FULL_SCREEN: 90, HALF_SCREEN: 50 }; // display only; API is authoritative
   const MAX_BYTES = 52428800; // 50 MB — friendly early guard; presign policy is the real gate
   const ALLOWED_TYPES = ['image/png', 'image/jpeg'];
 
@@ -336,8 +336,22 @@
   }
 
   // ---- Init ----
+  // Publish the deadline in the hero (reads the same injected value isClosed() uses).
+  function renderDeadline() {
+    const el = $('deadline-line');
+    if (!el) return;
+    const raw = CONFIG.submissionDeadline;
+    if (!raw || raw.indexOf('${') === 0) return;
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return;
+    const fmt = d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    el.textContent = `Submissions close ${fmt}`;
+    el.hidden = false;
+  }
+
   function init() {
     renderTurnstile(); // in case api.js already loaded before this script
+    renderDeadline();
 
     if (isClosed()) { showClosed(); return; }
 

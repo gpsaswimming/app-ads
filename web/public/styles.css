@@ -157,6 +157,24 @@ a { color: var(--blue); }
   color: #fff;
   font-variant-numeric: tabular-nums;
 }
+.hero-deadline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 20px 0 0;
+  font-size: .78rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: #ffd7d9;
+}
+.hero-deadline::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--red);
+}
 
 /* ================================ LAYOUT ================================ */
 .wrap {

@@ -27,8 +27,8 @@ function fullEnv(over = {}) {
 test('loads a complete env and applies defaults', () => {
   const cfg = loadConfig(fullEnv());
   assert.equal(cfg.minio.bucket, 'gpsa-ads');
-  assert.equal(cfg.pricing.FULL_SCREEN, 7500);
-  assert.equal(cfg.pricing.HALF_SCREEN, 4000);
+  assert.equal(cfg.pricing.FULL_SCREEN, 9000);
+  assert.equal(cfg.pricing.HALF_SCREEN, 5000);
   assert.equal(cfg.gemini.model, 'gemini-2.5-flash');
   assert.equal(cfg.nocodb.url, 'http://nocodb.gpsa.local:8080'); // trailing slash stripped
   assert.ok(Number.isFinite(cfg.submissionDeadlineMs));

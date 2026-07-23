@@ -61,8 +61,8 @@ export function loadConfig(env = process.env) {
     return n;
   };
 
-  const priceFull = num('PRICE_FULL_CENTS', env.PRICE_FULL_CENTS, 7500);
-  const priceHalf = num('PRICE_HALF_CENTS', env.PRICE_HALF_CENTS, 4000);
+  const priceFull = num('PRICE_FULL_CENTS', env.PRICE_FULL_CENTS, 9000);
+  const priceHalf = num('PRICE_HALF_CENTS', env.PRICE_HALF_CENTS, 5000);
   const maxUploadBytes = num('MAX_UPLOAD_BYTES', env.MAX_UPLOAD_BYTES, 52428800); // 50 MB
   const presignExpirySeconds = num('PRESIGN_EXPIRY_SECONDS', env.PRESIGN_EXPIRY_SECONDS, 900); // 15 min
   const port = num('PORT', env.PORT, 8080);
