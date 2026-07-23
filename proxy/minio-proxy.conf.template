@@ -35,8 +35,14 @@ server {
             return 405;
         }
 
-        # So the browser's XHR can read the upload result.
-        add_header Access-Control-Allow-Origin "${ALLOW_ORIGIN}" always;
+        # CORS: MinIO emits its OWN Access-Control-* headers, so we strip them from the
+        # upstream response and add exactly one of ours. Two Allow-Origin headers make the
+        # browser treat the response as invalid CORS and block it — even on a 204 success.
+        proxy_hide_header Access-Control-Allow-Origin;
+        proxy_hide_header Access-Control-Allow-Methods;
+        proxy_hide_header Access-Control-Allow-Credentials;
+        add_header Access-Control-Allow-Origin  "${ALLOW_ORIGIN}" always;
+        add_header Access-Control-Allow-Methods "POST, OPTIONS" always;
 
         client_max_body_size 50m;                 # matches the presign content-length cap
         proxy_set_header Host      $host;          # preserve host → presign signature validates
