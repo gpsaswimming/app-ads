@@ -25,8 +25,9 @@ go** so a fresh session can resume exactly where the last left off.
 ---
 
 ## Phase 0 — Repo scaffold
-- [ ] Create the structure: `web/`, `proxy/`, `services/ads-api/`, `infrastructure/`,
-      `.github/workflows/`, `docs/` (this file + `DESIGN.md`).
+- [ ] Create the structure: `services/{web,proxy,admin,ads-api}/`, `infrastructure/`,
+      `.github/workflows/`, `docs/` (this file + `DESIGN.md`). (Each build context is a
+      peer under `services/`; each produces one GHCR image.)
 - [ ] `.gitignore` — ignore `*.env` (keep `*.env.example`), `node_modules`, build output.
 - [ ] `README.md` — one-paragraph overview + links to `docs/DESIGN.md` and this plan.
 - [ ] Per-service `*.env.example` listing **every** key from DESIGN.md §7 with placeholder values.
@@ -65,7 +66,7 @@ Read first: DESIGN.md §2 (flow), §3 (invariants), §4 (data model), §5 (valid
   emails; real server boots + `curl /health` → 200; the real MinIO client signs a presigned POST to
   `ads-upload.gpsaswimming.org/gpsa-ads`. Live MinIO/NocoDB/SMTP wiring lands with Phase 4 infra.
 
-## Phase 2 — Web frontend (`web/` → image `app-ads-web`)
+## Phase 2 — Web frontend (`services/web/` → image `app-ads-web`)
 Read first: DESIGN.md §8 (form), §2 (flow), §1a (upload).
 - [x] `public/` static form per §8 field order; shared GPSA CSS + Inter; brand colors;
       `max-w-7xl mx-auto`, `showToast()`, `escapeHtml()`.
@@ -99,9 +100,9 @@ Read first: DESIGN.md §8 (form), §2 (flow), §1a (upload).
 > "environment-agnostic image" principle requires be injected, not baked: `SUBMISSION_DEADLINE` (so the
 > form renders the closed state at load, per §8's "form is primary gate, API is backstop") and
 > `API_UPSTREAM` (the App-tier host:port nginx proxies `/api/*` to). Both are documented in
-> `web/web.env.example`.
+> `services/web/web.env.example`.
 
-## Phase 3 — Upload proxy (`proxy/` → image `app-ads-proxy`)
+## Phase 3 — Upload proxy (`services/proxy/` → image `app-ads-proxy`)
 Read first: DESIGN.md §1a, §7 (`minio-proxy.conf` sketch).
 - [x] `minio-proxy.conf` — `POST /gpsa-ads` only (405 other methods, 403 everything else), CORS for
       `ALLOW_ORIGIN`, `proxy_set_header Host $host`, `client_max_body_size 50m`.
@@ -154,11 +155,11 @@ Read first: DESIGN.md §7 (compose, config/secrets), §4 (bucket + schema).
 
 ## Phase 5 — CI/CD (`.github/workflows/`)
 Read first: DESIGN.md §7; portfolio `../CLAUDE.md` (pinned `node24` action majors).
-- [x] Workflow (`build-images.yml`): on push to `main`, build + push the **3 images** to GHCR
+- [x] Workflow (`build-images.yml`): on push to `main`, build + push the custom images to GHCR
       (built-in `GITHUB_TOKEN`, `permissions: packages: write`). No app secrets in CI. Matrix over
-      web/proxy/api; `paths:` filter + `workflow_dispatch`.
+      the `services/*` build contexts (web/proxy/admin/api); `paths:` filter + `workflow_dispatch`.
 - [x] Tag `:latest` + commit SHA (`docker/metadata-action`).
-- **Verify:** a push yields 3 images pullable with no `docker login`.
+- **Verify:** a push yields the images pullable with no `docker login`.
   **Status (2026-07-23):** workflow authored + build contexts confirmed (all three Dockerfiles build;
   the `docker-compose.build.override.yml` rush path config-validates). The push-to-GHCR + **make each
   package Public** step completes on merge to `main` (packages default to private on first push — flip

@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>GPSA Scoreboard Ads — Admin</title>
+    <link rel="icon" href="https://assets.gpsaswimming.org/img/favicons/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="https://assets.gpsaswimming.org/img/favicons/favicon-32x32.png">
+    <link rel="apple-touch-icon" href="https://assets.gpsaswimming.org/img/favicons/apple-touch-icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- GPSA shared styles — toasts + brand tokens. Canonical source: css.gpsaswimming.org -->
+    <link rel="stylesheet" href="https://css.gpsaswimming.org/gpsa-tools-common.css">
+    <style>
+        :root {
+            --navy: #002366; --navy-hi: #0033a0; --red: #d9242b; --red-hi: #b81e24;
+            --ink: #14213d; --mut: #5b6473; --line: #e3e7ef; --bg: #f4f6fb; --card: #fff;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: Inter, system-ui, sans-serif; color: var(--ink);
+               background: var(--bg); -webkit-font-smoothing: antialiased; }
+        .topbar { background: var(--navy); color: #fff; padding: 14px 22px; display: flex;
+                  align-items: center; gap: 14px; }
+        .topbar img { height: 34px; width: auto; }
+        .topbar .title { font-weight: 700; font-size: 1.05rem; letter-spacing: .2px; }
+        .topbar .env { margin-left: auto; font-size: .72rem; text-transform: uppercase;
+                       letter-spacing: .12em; color: #9fb3e0; }
+        .wrap { max-width: 80rem; margin: 0 auto; padding: 22px; }
+
+        .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+        .filters { display: flex; gap: 6px; flex-wrap: wrap; }
+        .chip { border: 1px solid var(--line); background: var(--card); color: var(--mut);
+                border-radius: 999px; padding: 6px 13px; font-size: .82rem; font-weight: 600;
+                cursor: pointer; font-family: inherit; }
+        .chip.on { background: var(--navy); color: #fff; border-color: var(--navy); }
+        .chip .n { opacity: .65; margin-left: 5px; font-weight: 700; }
+        .spacer { margin-left: auto; }
+        .btn { border: 0; border-radius: 8px; padding: 8px 14px; font-weight: 600; font-size: .85rem;
+               cursor: pointer; font-family: inherit; }
+        .btn-ghost { background: var(--card); border: 1px solid var(--line); color: var(--ink); }
+        .btn-approve { background: #12855a; color: #fff; }
+        .btn-approve:hover { background: #0e6e4a; }
+        .btn-deny { background: var(--red); color: #fff; }
+        .btn-deny:hover { background: var(--red-hi); }
+        .btn:disabled { opacity: .5; cursor: default; }
+
+        .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+        .tablewrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+        th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line);
+                 white-space: nowrap; }
+        th { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--mut);
+             background: #fafbfe; position: sticky; top: 0; }
+        tbody tr { cursor: pointer; }
+        tbody tr:hover { background: #f7f9ff; }
+        td.company { white-space: normal; min-width: 190px; }
+        td.company .co { font-weight: 600; }
+        td.company .sub { color: var(--mut); font-size: .8rem; }
+        td.actions { white-space: nowrap; }
+        td.actions .btn { padding: 5px 10px; font-size: .78rem; margin-left: 6px; }
+        .muted { color: var(--mut); }
+
+        .badge { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: .72rem;
+                 font-weight: 700; letter-spacing: .02em; }
+        .b-NEEDS_REVIEW { background: #fdf0d5; color: #8a5a00; }
+        .b-APPROVED { background: #dcf3e8; color: #0e6e4a; }
+        .b-REJECTED { background: #fbe0e1; color: var(--red-hi); }
+        .b-AWAITING_UPLOAD, .b-VALIDATING, .b-UPLOADED { background: #e7ecf6; color: #45536e; }
+        .pay-PAID { color: #0e6e4a; font-weight: 600; }
+        .pay-PENDING { color: #8a5a00; }
+        .pay-WAIVED { color: var(--mut); }
+
+        .empty { padding: 48px 20px; text-align: center; color: var(--mut); }
+
+        /* Detail drawer */
+        .scrim { position: fixed; inset: 0; background: rgba(10,18,40,.55); display: none;
+                 align-items: stretch; justify-content: flex-end; z-index: 50; }
+        .scrim.open { display: flex; }
+        .drawer { width: min(560px, 100%); background: var(--bg); height: 100%; overflow-y: auto;
+                  box-shadow: -8px 0 30px rgba(0,0,0,.2); }
+        .drawer-head { background: var(--navy); color: #fff; padding: 18px 22px; position: sticky;
+                       top: 0; display: flex; align-items: flex-start; gap: 12px; }
+        .drawer-head h2 { margin: 0; font-size: 1.1rem; }
+        .drawer-head .x { margin-left: auto; background: transparent; border: 0; color: #cdd8f0;
+                          font-size: 1.6rem; line-height: 1; cursor: pointer; }
+        .drawer-body { padding: 22px; }
+        .preview { background: #0c1430; border-radius: 10px; padding: 10px; text-align: center;
+                   margin-bottom: 18px; }
+        .preview img { max-width: 100%; border-radius: 5px; display: block; margin: 0 auto; }
+        .preview .none { color: #8ea0c8; padding: 40px 10px; font-size: .9rem; }
+        dl.detail { display: grid; grid-template-columns: 34% 1fr; gap: 8px 14px; margin: 0 0 20px; }
+        dl.detail dt { color: var(--mut); font-size: .8rem; }
+        dl.detail dd { margin: 0; font-size: .88rem; word-break: break-word; }
+        .notes { background: #fdf0d5; color: #7a5000; border-radius: 8px; padding: 11px 13px;
+                 font-size: .85rem; margin-bottom: 18px; }
+        .drawer-actions { display: flex; gap: 10px; }
+        .drawer-actions .btn { flex: 1; padding: 11px; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <img src="https://assets.gpsaswimming.org/img/gpsa_logo.png" alt="GPSA"
+             onerror="this.onerror=null;this.src='https://placehold.co/80x80/002366/FFFFFF?text=GPSA';">
+        <span class="title">Scoreboard Ads · Admin</span>
+        <span class="env">Internal — VPN only</span>
+    </div>
+
+    <main class="wrap">
+        <div class="toolbar">
+            <div class="filters" id="filters"></div>
+            <div class="spacer"></div>
+            <button class="btn btn-ghost" id="refresh">↻ Refresh</button>
+        </div>
+
+        <div class="card">
+            <div class="tablewrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Company / Ad</th>
+                            <th>Team</th>
+                            <th>Placement</th>
+                            <th>Amount</th>
+                            <th>Payment</th>
+                            <th>Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="rows"></tbody>
+                </table>
+            </div>
+            <div class="empty" id="empty" hidden>No submissions match this filter.</div>
+        </div>
+    </main>
+
+    <!-- Detail drawer -->
+    <div class="scrim" id="scrim">
+        <aside class="drawer" role="dialog" aria-modal="true" aria-labelledby="d-title">
+            <div class="drawer-head">
+                <h2 id="d-title">Ad</h2>
+                <button class="x" id="d-close" aria-label="Close">×</button>
+            </div>
+            <div class="drawer-body">
+                <div class="preview" id="d-preview"></div>
+                <dl class="detail" id="d-detail"></dl>
+                <div class="notes" id="d-notes" hidden></div>
+                <div class="drawer-actions">
+                    <button class="btn btn-deny" id="d-deny">Deny</button>
+                    <button class="btn btn-approve" id="d-approve">Approve</button>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>

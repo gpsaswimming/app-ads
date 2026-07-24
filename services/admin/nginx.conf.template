@@ -1,0 +1,35 @@
+# app-ads-admin — internal dashboard. Serves the static admin SPA and reverse-proxies
+# /admin-api/* to the Ads API (Application tier). Holds ZERO credentials — the Ads API
+# stays the sole credential holder (DESIGN.md §3 inv 4). This container is deployed on the
+# VPN/LAN only and is NEVER added to the public edge (docs/TODO.md #1).
+# Rendered from this template at container start (envsubst injects ${API_UPSTREAM} and
+# ${RESOLVER}); nginx's own $-variables are left untouched.
+
+server {
+    listen       8080;
+    server_name  _;
+    root         /usr/share/nginx/html;
+    index        index.html;
+
+    # Admin requests are tiny JSON (approve/deny); artwork bytes flow the other way.
+    client_max_body_size 512k;
+
+    # Same-origin admin API → proxied to the Ads API. Upstream resolved LAZILY (variable
+    # proxy_pass + resolver) so the dashboard still serves if the API is momentarily down.
+    location /admin-api/ {
+        resolver           ${RESOLVER} valid=10s ipv6=off;
+        set $ads_upstream  ${API_UPSTREAM};
+        proxy_pass         http://$ads_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        # Artwork previews can be several MB — stream them straight through, no temp files.
+        proxy_buffering    off;
+    }
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+}

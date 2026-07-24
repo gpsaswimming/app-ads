@@ -36,6 +36,13 @@ export function adIdFromKey(key) {
   return String(key || '').split('/')[0] || null;
 }
 
+/** Object key from a stored `s3://{bucket}/{key}` Artwork_URI. Null if it doesn't match. */
+export function keyFromUri(uri, bucket) {
+  const prefix = `s3://${bucket}/`;
+  const s = String(uri || '');
+  return s.startsWith(prefix) ? s.slice(prefix.length) : null;
+}
+
 export function createMinioClients(cfg) {
   const common = { accessKey: cfg.accessKey, secretKey: cfg.secretKey, region: 'us-east-1' };
   const internal = new Client({ ...parseEndpoint(cfg.endpointInternal), ...common });

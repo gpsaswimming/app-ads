@@ -8,7 +8,7 @@ platform (DESIGN.md §7). One stack per VM/tier; the browser only ever touches t
 | File | Runs on | What it brings up / does |
 |---|---|---|
 | `docker-compose.dmz.yml` | DMZ VM | `web` + `minio-proxy` + `minio` |
-| `docker-compose.app.yml` | App VM | `ads-api` (the only credentialed component) |
+| `docker-compose.app.yml` | App VM | `ads-api` (the only credentialed component) + `admin` (internal dashboard, zero creds, VPN-only) |
 | `docker-compose.data.yml` | Data VM | `nocodb` (no internet egress; admin UI VPN-only) |
 | `minio-setup.sh` | DMZ (LAN) | private `gpsa-ads` bucket + ObjectCreated webhook + pending-cleanup rule + scoped service account |
 | `nocodb-setup.sh` | Data (LAN) | creates the base + `Ads` table (fields/enums per §4) + an API token |
@@ -18,7 +18,8 @@ platform (DESIGN.md §7). One stack per VM/tier; the browser only ever touches t
 Images are pulled from GHCR as **public** packages (Phase 5 builds + pushes them), so the
 VMs need no registry credential. Each `.env` is git-ignored and `chmod 600`; the committed
 `*.env.example` files document every key. `web`/`minio-proxy` env examples live with their
-images (`../web/`, `../proxy/`); `ads-api.env.example` lives in `../services/ads-api/`.
+images (`../services/web/`, `../services/proxy/`, `../services/admin/`); `ads-api.env.example`
+lives in `../services/ads-api/`.
 
 ## Bring-up order
 

@@ -53,8 +53,9 @@ emit "$ROOT/services/ads-api/ads-api.env.example" "ads-api.env" \
 emit "$HERE/nocodb.env.example" "nocodb.env" \
   "changeme-jwt-secret" "$NC_JWT"
 
-emit "$ROOT/web/web.env.example" "web.env"
-emit "$ROOT/proxy/proxy.env.example" "proxy.env"
+emit "$ROOT/services/web/web.env.example" "web.env"
+emit "$ROOT/services/proxy/proxy.env.example" "proxy.env"
+emit "$ROOT/services/admin/admin.env.example" "admin.env"
 
 cat <<OUT
 
