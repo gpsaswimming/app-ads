@@ -81,6 +81,21 @@ test('POST approve renames pending_→approved_, sets APPROVED, emails the submi
   assert.equal(res.json().ad.has_artwork, true);
 });
 
+test('POST approve tolerates a JSON content-type with an empty body (browser bare POST)', async () => {
+  const { app, noco } = makeTestApp(flagIt);
+  const adId = await submitToNeedsReview(app);
+
+  // Reproduce the dashboard's original request: application/json header, no body.
+  const res = await app.inject({
+    method: 'POST',
+    url: `/admin-api/ads/${adId}/approve`,
+    headers: { 'content-type': 'application/json' },
+    payload: '',
+  });
+  assert.equal(res.statusCode, 200); // not 400 FST_ERR_CTP_EMPTY_JSON_BODY
+  assert.equal(noco.rows.get(adId).Status, 'APPROVED');
+});
+
 test('POST approve is idempotent — a second call does not rename again', async () => {
   const { app, minio } = makeTestApp(flagIt);
   const adId = await submitToNeedsReview(app);

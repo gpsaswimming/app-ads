@@ -16,6 +16,20 @@ export function buildApp(ctx, opts = {}) {
     ...opts.fastify,
   });
 
+  // Tolerate an empty body on JSON POSTs. A no-payload action like approve legitimately
+  // POSTs with `Content-Type: application/json` and no body; Fastify's default parser
+  // rejects that with FST_ERR_CTP_EMPTY_JSON_BODY (400). Treat empty as "no body"; keep
+  // strict parsing (400) for malformed non-empty JSON.
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
+    if (body === '' || body == null) return done(null, undefined);
+    try {
+      done(null, JSON.parse(body));
+    } catch (err) {
+      err.statusCode = 400;
+      done(err);
+    }
+  });
+
   const hctx = { ...ctx, log: app.log };
   const submit = makeSubmitHandler(hctx);
   const uploaded = makeUploadedHandler(hctx);

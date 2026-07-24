@@ -77,7 +77,9 @@
   async function act(ad, action, body) {
     const res = await fetch(`/admin-api/ads/${encodeURIComponent(ad.ad_id)}/${action}`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      // Only declare a JSON content-type when we actually send a body — a bare POST
+      // (approve) with no body must not claim application/json.
+      headers: body ? { 'content-type': 'application/json' } : {},
       body: body ? JSON.stringify(body) : undefined,
     });
     if (!res.ok) {
