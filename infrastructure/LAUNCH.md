@@ -4,8 +4,8 @@ The fastest path from this repo to a live intake form. The app is verified end-t
 what's left is **deploy + real credentials**. Two ways to get the images:
 
 - **CI (normal):** push to `main` → `.github/workflows/build-images.yml` pushes
-  `ghcr.io/gpsaswimming/app-ads-{web,proxy,api}` to GHCR. **Make each package Public once**
-  (GHCR package → Settings → Change visibility) so the VMs pull with no `docker login`.
+  `ghcr.io/gpsaswimming/app-ads-{web,proxy,admin,api}` to GHCR. **Make each package Public
+  once** (GHCR package → Settings → Change visibility) so the VMs pull with no `docker login`.
 - **Rush (one host, no registry):** add `-f docker-compose.build.override.yml` to build locally.
 
 ## Credentials you must supply (nothing else is a decision)
@@ -38,9 +38,13 @@ NC_ADMIN_PASSWORD='…' ./nocodb-setup.sh      # paste NOCODB_* into ads-api.env
 docker compose -f docker-compose.dmz.yml up -d      # add: -f docker-compose.build.override.yml --build  (rush)
 MINIO_ROOT_USER=… MINIO_ROOT_PASSWORD=… ./minio-setup.sh   # paste MINIO_ACCESS/SECRET_KEY into ads-api.env
 
-# App tier (ads-api.env now complete)
+# App tier (ads-api.env now complete) — brings up ads-api + the internal admin dashboard
 docker compose -f docker-compose.app.yml up -d      # add the override + --build for the rush path
 ```
+
+The **admin dashboard** comes up with the App tier at `127.0.0.1:8090` on the App VM
+(review / approve / deny). It is **VPN/LAN only** — reach it over the VPN (or an SSH tunnel);
+never add it to the public edge. See [../services/admin/](../services/admin/).
 
 ## Edge (the last mile — your Traefik/tunnel)
 
@@ -49,7 +53,8 @@ docker compose -f docker-compose.app.yml up -d      # add the override + --build
 | `ads.gpsaswimming.org` | web `:8080` | serves the form + proxies `/api/*` |
 | `ads-upload.gpsaswimming.org` | minio-proxy `:8082` | `POST /gpsa-ads` only |
 
-Keep MinIO `:9000/:9001`, NocoDB, and `/internal/*` **off** the public edge (LAN/VPN only).
+Keep MinIO `:9000/:9001`, NocoDB, the admin dashboard `:8090`, and `/internal/*` **off** the
+public edge (LAN/VPN only).
 
 ## Smoke test
 

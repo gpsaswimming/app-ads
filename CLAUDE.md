@@ -111,11 +111,12 @@ workflow engine; no local AI. Do not introduce them.
 app-ads/
 ├── docs/DESIGN.md                     ← the design / source of truth (read the relevant section first)
 ├── docs/IMPLEMENTATION.md             ← sequenced build checklist — resume here each session
-├── web/                               ← app-ads-web image: public/ (form) + nginx.conf + Dockerfile
-├── proxy/                             ← app-ads-proxy image: minio-proxy.conf + Dockerfile
-├── services/ads-api/                  ← app-ads-api image: Fastify (/api/submit, /internal/uploaded, /health) + Dockerfile
+├── services/web/                      ← app-ads-web image: public/ (form) + nginx.conf + Dockerfile
+├── services/proxy/                    ← app-ads-proxy image: minio-proxy.conf + Dockerfile
+├── services/admin/                    ← app-ads-admin image: internal dashboard SPA + /admin-api/* proxy + Dockerfile
+├── services/ads-api/                  ← app-ads-api image: Fastify (/api/submit, /internal/uploaded, /admin-api/*, /health) + Dockerfile
 ├── infrastructure/docker-compose.yml  ← per-tier stacks (DMZ / App / Data), dedicated VM
-└── .github/workflows/                 ← CI: build + push the 3 images to GHCR
+└── .github/workflows/                 ← CI: build + push the images to GHCR
 ```
 
 ## Deploy-time values to supply (DESIGN.md §10)

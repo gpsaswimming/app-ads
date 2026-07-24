@@ -29,6 +29,9 @@ export function fakeNoco() {
     async findByAdId(adId) {
       return rows.get(adId) || null;
     },
+    async listAds() {
+      return [...rows.values()];
+    },
   };
 }
 

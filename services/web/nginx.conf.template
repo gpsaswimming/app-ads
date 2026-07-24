@@ -32,6 +32,11 @@ server {
     # /internal/* is never publicly routable (§3 inv 8) — the DMZ simply doesn't expose it.
     location /internal/ { return 404; }
 
+    # /admin-api/* is the internal dashboard backend — reachable only from the VPN-only
+    # app-ads-admin container, never the public edge (docs/TODO.md #1). The public form
+    # only ever proxies /api/*; refuse the admin surface here as defense-in-depth.
+    location /admin-api/ { return 404; }
+
     # Runtime-generated config: never cache, so a redeploy's new keys take effect at once.
     location = /config.js {
         add_header Cache-Control "no-store";

@@ -56,5 +56,15 @@ export function createNocoClient({ url, token, tableId, fetchImpl = fetch }) {
       const list = data && Array.isArray(data.list) ? data.list : [];
       return list[0] || null;
     },
+
+    /**
+     * List Ads rows for the admin dashboard. Volume is tiny (dozens per season), so we
+     * fetch everything and let the browser filter/sort — no server-side status filter to
+     * maintain, and no coupling to a system sort-field name. `limit` is a safety ceiling.
+     */
+    async listAds({ limit = 1000 } = {}) {
+      const data = await request('GET', `?limit=${Number(limit) || 1000}`);
+      return data && Array.isArray(data.list) ? data.list : [];
+    },
   };
 }

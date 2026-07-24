@@ -1,8 +1,10 @@
-# Application tier VM — the Ads API, the ONLY credentialed component (DESIGN.md §3, §7).
-# Makes the outbound calls (Gemini, SMTP). Reached by DMZ nginx (/api/*) and by MinIO's
+# Application tier VM — the Ads API (the ONLY credentialed component, DESIGN.md §3, §7)
+# plus the zero-credential internal admin dashboard co-located with it. The API makes the
+# outbound calls (Gemini, SMTP) and is reached by DMZ nginx (/api/*) and by MinIO's
 # ObjectCreated webhook (/internal/uploaded), across the inter-tier firewall.
 #
 #   cp ../services/ads-api/ads-api.env.example ads-api.env   # fill it, chmod 600
+#   cp ../services/admin/admin.env.example admin.env         # set API_UPSTREAM
 #   docker compose -f docker-compose.app.yml up -d
 
 services:
@@ -12,3 +14,17 @@ services:
     env_file: ./ads-api.env
     ports:
       - "8080:8080"   # DMZ nginx → /api/*  ·  MinIO webhook → /internal/uploaded
+
+  # Internal admin dashboard (docs/TODO.md #1). Serves the static SPA and reverse-proxies
+  # /admin-api/* to ads-api over the compose network (API_UPSTREAM=ads-api:8080). Holds
+  # ZERO credentials. INTERNAL ONLY: the port is bound to loopback here so it is not
+  # reachable from outside the host by default — expose it to operators over the VPN
+  # (change the binding to the VPN interface IP, or reach it via an SSH/VPN tunnel).
+  # NEVER add this service to the public edge reverse proxy.
+  admin:
+    image: ghcr.io/gpsaswimming/app-ads-admin:latest
+    restart: unless-stopped
+    env_file: ./admin.env
+    depends_on: [ads-api]
+    ports:
+      - 8090:8080   # VPN/LAN only — never edge-routed
