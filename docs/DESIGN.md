@@ -804,20 +804,28 @@ object storage and adds no NocoDB table.
 - `GET /api/team/ads/:adId/artwork` → streams the ad's image bytes from storage (private bucket;
   same as `admin.artwork`). 404 if the ad or its object is missing.
 
-**Data returned** — a projection of the existing `Ads` table (no new fields): `ad_id` (the UUID, a
-handle for the artwork request), `Team`, `Ad_Title`, advertiser (`Company_Name` / `Advertiser_Name`),
-`Placement`, submitted date (`CreatedAt`), `Status`, a `has_artwork` flag, and — for rejected rows —
-`Validation_Notes` as the reason. It **never** returns `Artwork_URI` / object keys, payment fields, or
-submitter PII beyond the advertiser name.
+**Data returned** — a projection of the existing `Ads` table: `ad_id` (the UUID, a handle for the
+artwork request), `Team`, `Ad_Title`, advertiser (`Company_Name` / `Advertiser_Name`), `Placement`,
+submitted date (`CreatedAt`), `Status`, a `has_artwork` flag, `price_cents` (the ad rate; null for
+rejected), `gpsa_due_cents` (this ad's contribution to the team's GPSA share — half of an **approved,
+team-affiliated** ad; 0 otherwise), and — for rejected rows — `Validation_Notes` as the reason. It
+**never** returns `Artwork_URI` / object keys, `Payment_Method` / `Payment_Status`, or submitter PII
+beyond the advertiser name.
+
+**Pricing / amount due.** The 50/50 split means a team owes GPSA **half of each approved ad**
+(advertiser pays the team, team remits GPSA's share). The API computes `gpsa_due_cents` server-side
+(the single source of the split rule); the UI shows the full ad rate per row and a per-team
+**"Due to GPSA (50% of approved)"** subtotal. It's a **gross obligation** (ignores `Payment_Status`).
+GPSA-affiliation ads are paid to GPSA directly, so that group shows "Paid to GPSA directly," not a due.
 
 **Status handling.** Shows `APPROVED` + `NEEDS_REVIEW` (labeled "Approved" / "Under review") by
 default; transient states (`AWAITING_UPLOAD` / `VALIDATING`) are hidden; `REJECTED` is hidden behind a
 **"Show rejected"** toggle that reveals the reason and a **"fix & resubmit"** link to the public form
 (resubmit = a new `Ad_ID`, per the §4 state machine).
 
-**UI.** Read-only single screen — the list is **grouped by team** (a team subheading, then that
-team's ads newest-first; teams alphabetical) for easy scanning. Columns: **Ad · Advertiser ·
-Placement · Submitted · Status badge** (Approved = green, Under review = amber, Rejected = red). An
-ad title with artwork is a link that opens the image in a **lightbox** (Esc / click-away to close).
-Responsive — table on desktop, cards on mobile. States: loading · empty · fetch error. Shared CDN
-CSS, Inter, brand colors, and the existing toast system, consistent with the submission form.
+**UI.** Read-only single screen — the list is **grouped by team** (a team subheading, that team's ads
+newest-first, then a **"Due to GPSA" subtotal footer**; teams alphabetical) for easy scanning.
+Columns: **Ad · Advertiser · Placement · Submitted · Price · Status badge** (Approved = green, Under
+review = amber, Rejected = red). An ad title with artwork is a link that opens the image in a
+**lightbox** (Esc / click-away to close). Responsive — table on desktop, cards on mobile. States:
+loading · empty · fetch error. Shared CDN CSS, Inter, brand colors, and the existing toast system.

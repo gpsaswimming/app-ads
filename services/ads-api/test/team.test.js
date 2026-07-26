@@ -20,11 +20,12 @@ function seededNoco() {
   add({
     Ad_ID: 'a2', Team: 'Wythe', Status: 'NEEDS_REVIEW', Ad_Title: 'Bay Dental',
     Company_Name: 'Bay Dental', Placement: 'HALF_SCREEN', CreatedAt: '2026-07-14T12:00:00Z',
+    Payment_Amount: 5000,
   });
   add({
     Ad_ID: 'a3', Team: 'Wythe', Status: 'REJECTED', Ad_Title: 'Ace Vaping',
     Company_Name: 'Ace Vaping', Placement: 'FULL_SCREEN', CreatedAt: '2026-07-15T12:00:00Z',
-    Validation_Notes: 'Not permitted (adult product)',
+    Payment_Amount: 9000, Validation_Notes: 'Not permitted (adult product)',
   });
   add({
     Ad_ID: 'a4', Team: 'Wythe', Status: 'AWAITING_UPLOAD', Ad_Title: 'Half-done',
@@ -33,6 +34,12 @@ function seededNoco() {
   add({
     Ad_ID: 'b1', Team: 'Glendale', Status: 'APPROVED', Ad_Title: 'Other Team Ad',
     Company_Name: 'Other Team Ad', Placement: 'FULL_SCREEN', CreatedAt: '2026-07-11T12:00:00Z',
+    Payment_Amount: 9000,
+  });
+  add({
+    Ad_ID: 'g1', Team: 'GPSA', Status: 'APPROVED', Ad_Title: 'League Banner',
+    Company_Name: 'GPSA', Placement: 'FULL_SCREEN', CreatedAt: '2026-07-09T12:00:00Z',
+    Payment_Amount: 9000,
   });
   return noco;
 }
@@ -44,7 +51,7 @@ test('ads: default = approved + under review across ALL teams, excludes rejected
   const res = await app.inject({ method: 'GET', url: '/api/team/ads' });
   assert.equal(res.statusCode, 200);
   const titles = res.json().ads.map((a) => a.ad_title).sort();
-  assert.deepEqual(titles, ['Bay Dental', "Joe's Pizza", 'Other Team Ad']); // a1 + a2 + b1
+  assert.deepEqual(titles, ['Bay Dental', "Joe's Pizza", 'League Banner', 'Other Team Ad']); // a1,a2,b1,g1
   assert.ok(!titles.includes('Ace Vaping'), 'rejected hidden by default');
   assert.ok(!titles.includes('Half-done'), 'transient hidden');
 });
@@ -80,18 +87,37 @@ test('ads: reason is only exposed on rejected rows', async () => {
   assert.equal(approved.reason, '');
 });
 
-test('ads: projection never leaks PII / payment / artwork URI', async () => {
+test('ads: projection exposes price but never PII / artwork URI', async () => {
   const { app } = appWith();
   const res = await app.inject({ method: 'GET', url: '/api/team/ads' });
   const ad = res.json().ads[0];
   assert.deepEqual(
     Object.keys(ad).sort(),
-    ['ad_id', 'ad_title', 'advertiser', 'has_artwork', 'placement', 'reason', 'status', 'submitted_at', 'team'],
+    ['ad_id', 'ad_title', 'advertiser', 'gpsa_due_cents', 'has_artwork', 'placement',
+      'price_cents', 'reason', 'status', 'submitted_at', 'team'],
   );
   const serialized = JSON.stringify(res.json());
   assert.ok(!serialized.includes('joe@example.com'), 'no submitter email');
-  assert.ok(!serialized.includes('9000'), 'no payment amount');
   assert.ok(!serialized.includes('s3://'), 'no raw artwork URI (only a has_artwork flag)');
+});
+
+test('pricing: price_cents is the ad rate; null for rejected', async () => {
+  const { app } = appWith();
+  const res = await app.inject({ method: 'GET', url: '/api/team/ads?include_rejected=true' });
+  const by = Object.fromEntries(res.json().ads.map((a) => [a.ad_title, a]));
+  assert.equal(by["Joe's Pizza"].price_cents, 9000);   // Full
+  assert.equal(by['Bay Dental'].price_cents, 5000);    // Half
+  assert.equal(by['Ace Vaping'].price_cents, null);    // rejected → no price
+});
+
+test('pricing: gpsa_due_cents = half of an approved TEAM ad; 0 otherwise', async () => {
+  const { app } = appWith();
+  const res = await app.inject({ method: 'GET', url: '/api/team/ads' });
+  const by = Object.fromEntries(res.json().ads.map((a) => [a.ad_title, a]));
+  assert.equal(by["Joe's Pizza"].gpsa_due_cents, 4500);  // Wythe, approved → half
+  assert.equal(by['Other Team Ad'].gpsa_due_cents, 4500); // Glendale, approved → half
+  assert.equal(by['Bay Dental'].gpsa_due_cents, 0);       // under review → not counted
+  assert.equal(by['League Banner'].gpsa_due_cents, 0);    // GPSA affiliation → paid directly
 });
 
 test('ads: has_artwork reflects whether an object is present', async () => {

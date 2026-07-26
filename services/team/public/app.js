@@ -54,6 +54,12 @@
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   }
 
+  function money(cents) {
+    if (cents == null) return '—';
+    const d = cents / 100;
+    return Number.isInteger(d) ? `$${d}` : `$${d.toFixed(2)}`;
+  }
+
   // ---- data loading ----
   async function loadAds() {
     setView('loading');
@@ -105,6 +111,7 @@
       const rows = groups.get(team);
       tbody.appendChild(groupHeader(team, rows.length));
       rows.forEach((a) => tbody.appendChild(rowFor(a)));
+      tbody.appendChild(groupFooter(team, rows));
     });
     setView('list');
   }
@@ -114,7 +121,7 @@
     const tr = document.createElement('tr');
     tr.className = 'group';
     const td = document.createElement('td');
-    td.colSpan = 5;
+    td.colSpan = 6;
     const label = document.createElement('span');
     label.textContent = team; // textContent — team is enum-ish, escaped structurally
     const count = document.createElement('span');
@@ -122,6 +129,36 @@
     count.textContent = String(n);
     td.appendChild(label);
     td.appendChild(count);
+    tr.appendChild(td);
+    return tr;
+  }
+
+  // Per-team footer: what the team owes GPSA (50% of its approved ads). GPSA's own group
+  // is paid to GPSA directly, so it shows a note instead of a due amount.
+  function groupFooter(team, rows) {
+    const tr = document.createElement('tr');
+    tr.className = 'group-foot';
+    const td = document.createElement('td');
+    td.colSpan = 6;
+    const inner = document.createElement('div');
+    inner.className = 'foot-inner';
+
+    if (team === 'GPSA') {
+      const note = document.createElement('span');
+      note.className = 'note';
+      note.textContent = 'Paid to GPSA directly';
+      inner.appendChild(note);
+    } else {
+      const due = rows.reduce((sum, a) => sum + (a.gpsa_due_cents || 0), 0);
+      const label = document.createElement('span');
+      label.textContent = 'Due to GPSA (50% of approved)';
+      const amt = document.createElement('span');
+      amt.className = 'due-amt';
+      amt.textContent = money(due);
+      inner.appendChild(label);
+      inner.appendChild(amt);
+    }
+    td.appendChild(inner);
     tr.appendChild(td);
     return tr;
   }
@@ -169,6 +206,11 @@
     dateTd.dataset.label = 'Submitted';
     dateTd.classList.add('nowrap', 'muted');
     tr.appendChild(dateTd);
+
+    const priceTd = cell(money(a.price_cents));
+    priceTd.dataset.label = 'Price';
+    priceTd.classList.add('nowrap', 'price');
+    tr.appendChild(priceTd);
 
     const statusTd = document.createElement('td');
     statusTd.dataset.label = 'Status';
