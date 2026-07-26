@@ -70,6 +70,14 @@
         tr.group td { background: #eef2fb; color: var(--navy); font-weight: 700; font-size: .78rem;
                       text-transform: uppercase; letter-spacing: .06em; padding: 9px 16px; }
         tr.group .n { opacity: .6; font-weight: 600; margin-left: 7px; }
+        th.price, td.price { text-align: right; }
+        td.price { font-variant-numeric: tabular-nums; }
+        tr.group-foot td { background: #fafbfe; padding: 9px 16px; border-bottom: 2px solid var(--line); }
+        tr.group-foot .foot-inner { display: flex; justify-content: space-between; align-items: baseline;
+                                    gap: 16px; font-size: .82rem; color: var(--mut); }
+        tr.group-foot .due-amt { font-weight: 700; color: var(--navy); font-size: .92rem;
+                                 font-variant-numeric: tabular-nums; }
+        tr.group-foot .note { font-style: italic; }
 
         .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: .72rem;
                  font-weight: 700; letter-spacing: .02em; white-space: nowrap; }
@@ -94,8 +102,8 @@
                          text-transform: uppercase; letter-spacing: .06em; font-weight: 600; flex: 0 0 auto; }
             td.title { flex-direction: column; }
             td.title::before { content: ""; display: none; }
-            tr.group td { display: block; }
-            tr.group td::before { display: none; }
+            tr.group td, tr.group-foot td { display: block; }
+            tr.group td::before, tr.group-foot td::before { display: none; }
         }
     </style>
 </head>
@@ -127,6 +135,7 @@
                             <th>Advertiser</th>
                             <th>Placement</th>
                             <th>Submitted</th>
+                            <th class="price">Price</th>
                             <th>Status</th>
                         </tr>
                     </thead>
