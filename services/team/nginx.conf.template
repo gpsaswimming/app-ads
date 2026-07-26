@@ -1,0 +1,48 @@
+# app-ads-team — team-facing ad view. Serves the static SPA and reverse-proxies
+# /api/team/* to the Ads API (Application tier). Holds ZERO credentials (DESIGN.md §3 inv 2).
+#
+# This whole origin (team-ads.gpsaswimming.org) sits behind the edge's email auth. The edge
+# authenticates the viewer and injects the verified identity header, STRIPPING any
+# client-supplied copy, then proxies here; nginx forwards that header upstream unchanged.
+# Rendered from this template at container start (envsubst injects ${API_UPSTREAM} and
+# ${RESOLVER}); nginx's own $-variables are left untouched.
+
+server {
+    listen       8080;
+    server_name  _;
+    root         /usr/share/nginx/html;
+    index        index.html;
+
+    # Team requests are tiny JSON GETs.
+    client_max_body_size 64k;
+
+    # Same-origin team API → proxied to the Ads API across the inter-tier firewall.
+    # Cleartext HTTP between tiers by design (§3 inv 11); TLS terminates at the edge. The
+    # upstream is resolved LAZILY (variable proxy_pass + resolver) so the page still serves
+    # if the API is momentarily unreachable.
+    location /api/team/ {
+        resolver           ${RESOLVER} valid=10s ipv6=off;
+        set $ads_upstream  ${API_UPSTREAM};
+        proxy_pass         http://$ads_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+    }
+
+    # This origin exposes ONLY the team API. Refuse the public submit, admin, and internal
+    # surfaces as defense-in-depth (longest-prefix match keeps /api/team/ above /api/).
+    location /api/ { return 404; }
+    location /admin-api/ { return 404; }
+    location /internal/ { return 404; }
+
+    # Runtime-generated config: never cache, so a redeploy's new values take effect at once.
+    location = /config.js {
+        add_header Cache-Control "no-store";
+    }
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+}

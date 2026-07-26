@@ -253,6 +253,14 @@ boundary. Keeping internet egress out of the data tier is worth the extra hop.
 11. **Cleartext internal HTTP between tiers** so the inter-tier firewall can perform full DPI on
     inter-tier calls. TLS terminates at the edge only.
 12. **The `gpsa-ads` bucket is fully private** (no public ACL).
+13. **The team ad view is edge-authenticated and scope-authorized server-side** (§12). The team
+    origin (`team-ads.gpsaswimming.org`) sits entirely behind the edge's email auth; the edge
+    injects a verified identity header with client-supplied copies stripped. The Ads API trusts
+    that header only because it can't arrive any other way, resolves the caller's affiliations from
+    the `Reps` allowlist, and validates **every** requested scope against it — no cross-team view
+    exists. The public form origin **404s `/api/team/*`**, so the team API is reachable only through
+    the authenticated front. The view is **metadata only**: no artwork, payment, or submitter PII
+    (beyond the advertiser name) crosses this boundary.
 
 ---
 
@@ -303,6 +311,20 @@ boundary. Keeping internet egress out of the data tier is worth the extra hop.
 
 **Data minimization:** the artwork file is the artifact of record and lives only in object
 storage. The database holds queryable metadata + workflow state + a pointer (`Artwork_URI`).
+
+### NocoDB — Table: `Reps` (team ad view, §12)
+
+The authorization allowlist for the team-facing view. Operator-maintained (editable without a
+deploy); optional — the Ads API only reads it when `NOCODB_REPS_TABLE_ID` is set.
+
+| Field | Type | Notes |
+|---|---|---|
+| `Email` | Email | A team contact's login email. Matched case-insensitively against the edge-injected identity. |
+| `Affiliations` | MultiSelect | The affiliations this email may view — any of the 18 teams and/or `GPSA` (peer scopes). Multiple rows for one email are unioned. |
+
+Provisioned by `infrastructure/nocodb-setup.sh` (prints `NOCODB_REPS_TABLE_ID`). Only these two
+columns are read; the API validates each value against the known affiliations so a typo can't widen
+access.
 
 ### Object storage — bucket `gpsa-ads` (private)
 

@@ -13,6 +13,12 @@ server {
     # JSON metadata body has a small ceiling anyway.
     client_max_body_size 512k;
 
+    # /api/team/* is the team-facing view's backend — served only via the separate,
+    # edge-authenticated team-ads origin (DESIGN.md §12), NEVER the public form. Refuse it
+    # here (longest-prefix match keeps this above /api/) so the public origin can't reach
+    # the team API even with a spoofed identity header. Defense-in-depth for §3 inv 13.
+    location /api/team/ { return 404; }
+
     # Same-origin API. nginx proxies across the inter-tier firewall to the App tier.
     # Cleartext HTTP between tiers by design (§3 inv 11) — TLS terminates at the edge.
     # The upstream is resolved LAZILY (variable proxy_pass + resolver) so the static form

@@ -6,6 +6,7 @@ import Fastify from 'fastify';
 
 import { makeAdminHandlers } from './handlers/admin.js';
 import { makeSubmitHandler } from './handlers/submit.js';
+import { makeTeamHandlers } from './handlers/team.js';
 import { makeUploadedHandler } from './handlers/uploaded.js';
 
 export function buildApp(ctx, opts = {}) {
@@ -34,6 +35,7 @@ export function buildApp(ctx, opts = {}) {
   const submit = makeSubmitHandler(hctx);
   const uploaded = makeUploadedHandler(hctx);
   const admin = makeAdminHandlers(hctx);
+  const team = makeTeamHandlers(hctx);
 
   app.get('/health', async () => ({ status: 'ok', service: 'app-ads-api' }));
   app.post('/api/submit', submit);
@@ -46,6 +48,12 @@ export function buildApp(ctx, opts = {}) {
   app.get('/admin-api/ads/:adId/artwork', admin.artwork);
   app.post('/admin-api/ads/:adId/approve', admin.approve);
   app.post('/admin-api/ads/:adId/deny', admin.deny);
+
+  // /api/team/* — the team-facing ad view (§12). Read-only, metadata only. Served on the
+  // dedicated team-ads origin behind the edge's email auth; the API authorizes every scope
+  // against the Reps allowlist (handler inv 13). The public form front 404s this path.
+  app.get('/api/team/scopes', team.scopes);
+  app.get('/api/team/ads', team.ads);
 
   return app;
 }

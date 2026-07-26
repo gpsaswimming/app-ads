@@ -181,6 +181,24 @@ Read first: DESIGN.md §7 (domains / traffic model).
 
 ---
 
+## Phase 7 — Team ad view (`team-ads.gpsaswimming.org`) — DESIGN.md §12, §3 inv 13
+Read first: DESIGN.md §12 + the §4 `Reps` table + §3 inv 13. Read-only, metadata-only; reuses the
+Ads API, adds one NocoDB table + one DMZ front. **No object storage, no payment data.**
+- [x] Ads API: `Reps` client (`clients/reps.js`, case-insensitive email → affiliations), `noco.listByTeam`,
+      `/api/team/scopes` + `/api/team/ads` handlers (`handlers/team.js`) with server-side scope authz +
+      status filtering + safe projection. Feature-gated on `NOCODB_REPS_TABLE_ID` (503 when unset).
+- [x] Config: optional `NOCODB_REPS_TABLE_ID` + `TEAM_IDENTITY_HEADER` (default `X-Forwarded-Email`).
+- [x] Tests: `test/team.test.js` (auth, authz, filtering, rejected toggle, PII/payment/artwork non-leak,
+      503 gating). 13 tests; full suite green.
+- [x] Front container `app-ads-team` (`services/team/`): static SPA (switcher, Show-rejected toggle,
+      responsive cards) + nginx proxying `/api/team/*`; zero creds; behind the edge's email auth.
+- [x] Public form front 404s `/api/team/*` (defense-in-depth for inv 13).
+- [x] CI matrix + DMZ compose service (`:8083`) + build override; `nocodb-setup.sh` provisions `Reps`.
+- **Verify (deploy-time):** edge authenticates `team-ads.gpsaswimming.org` and injects the identity
+      header (stripping client copies); seed the `Reps` table; confirm a rep sees only their team's
+      approved/under-review ads, the toggle reveals rejected-with-reason, and a cross-team `?team=`
+      returns 403.
+
 ## Deferred (do NOT build now) — DESIGN.md §12
 - Meet-selection dropdown (2027+). The `Ads.Meet` field already exists; leave it config-set for the
   single 2026 City Meet.

@@ -26,6 +26,8 @@ jobs:
             context: ./services/web
           - name: app-ads-admin
             context: ./services/admin
+          - name: app-ads-team
+            context: ./services/team
           - name: app-ads-proxy
             context: ./services/proxy
           - name: app-ads-api

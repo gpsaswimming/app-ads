@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>GPSA Scoreboard Ads — Your Team</title>
+    <link rel="icon" href="https://assets.gpsaswimming.org/img/favicons/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="https://assets.gpsaswimming.org/img/favicons/favicon-32x32.png">
+    <link rel="apple-touch-icon" href="https://assets.gpsaswimming.org/img/favicons/apple-touch-icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- GPSA shared styles — toasts + brand tokens. Canonical source: css.gpsaswimming.org -->
+    <link rel="stylesheet" href="https://css.gpsaswimming.org/gpsa-tools-common.css">
+    <style>
+        :root {
+            --navy: #002366; --navy-hi: #0033a0; --red: #d9242b; --red-hi: #b81e24;
+            --ink: #14213d; --mut: #5b6473; --line: #e3e7ef; --bg: #f4f6fb; --card: #fff;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: Inter, system-ui, sans-serif; color: var(--ink);
+               background: var(--bg); -webkit-font-smoothing: antialiased; }
+        .topbar { background: var(--navy); color: #fff; padding: 14px 22px; display: flex;
+                  align-items: center; gap: 14px; flex-wrap: wrap; }
+        .topbar img { height: 34px; width: auto; }
+        .topbar .title { font-weight: 700; font-size: 1.05rem; letter-spacing: .2px; }
+        .topbar .switch { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+        .topbar .switch label { font-size: .74rem; text-transform: uppercase; letter-spacing: .1em;
+                                color: #9fb3e0; }
+        select#scope { font-family: inherit; font-size: .9rem; font-weight: 600; color: var(--ink);
+                       background: #fff; border: 0; border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+        .team-static { font-weight: 700; font-size: .95rem; }
+        .wrap { max-width: 72rem; margin: 0 auto; padding: 22px; }
+
+        .toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+        .summary { color: var(--mut); font-size: .9rem; }
+        .summary strong { color: var(--ink); }
+        .spacer { margin-left: auto; }
+        .toggle { display: inline-flex; align-items: center; gap: 7px; font-size: .85rem;
+                  color: var(--ink); cursor: pointer; user-select: none; }
+        .btn { border: 0; border-radius: 8px; padding: 8px 14px; font-weight: 600; font-size: .85rem;
+               cursor: pointer; font-family: inherit; }
+        .btn-ghost { background: var(--card); border: 1px solid var(--line); color: var(--ink); }
+
+        .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+        .tablewrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+        th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--line); vertical-align: top; }
+        th { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--mut);
+             background: #fafbfe; white-space: nowrap; }
+        tbody tr:last-child td { border-bottom: 0; }
+        td.title .t { font-weight: 600; }
+        td.title .reason { color: var(--red-hi); font-size: .8rem; margin-top: 3px; }
+        .nowrap { white-space: nowrap; }
+        .muted { color: var(--mut); }
+
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: .72rem;
+                 font-weight: 700; letter-spacing: .02em; white-space: nowrap; }
+        .b-APPROVED { background: #dcf3e8; color: #0e6e4a; }
+        .b-NEEDS_REVIEW { background: #fdf0d5; color: #8a5a00; }
+        .b-REJECTED { background: #fbe0e1; color: var(--red-hi); }
+
+        .state { padding: 52px 22px; text-align: center; color: var(--mut); }
+        .state h2 { color: var(--ink); font-size: 1.1rem; margin: 0 0 8px; }
+        .state a { color: var(--navy-hi); font-weight: 600; }
+        .state .btn { margin-top: 14px; }
+        .hidden { display: none !important; }
+
+        /* Responsive: table → stacked cards on narrow screens. */
+        @media (max-width: 640px) {
+            thead { display: none; }
+            table, tbody, tr, td { display: block; width: 100%; }
+            tr { border-bottom: 1px solid var(--line); padding: 6px 0; }
+            tbody tr:last-child { border-bottom: 0; }
+            td { border: 0; padding: 6px 16px; display: flex; justify-content: space-between; gap: 16px; }
+            td::before { content: attr(data-label); color: var(--mut); font-size: .72rem;
+                         text-transform: uppercase; letter-spacing: .06em; font-weight: 600; flex: 0 0 auto; }
+            td.title { flex-direction: column; }
+            td.title::before { content: ""; display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <img src="https://assets.gpsaswimming.org/img/gpsa_logo.png" alt="GPSA"
+             onerror="this.onerror=null;this.src='https://placehold.co/80x80/002366/FFFFFF?text=GPSA';">
+        <span class="title">Scoreboard Ads · Your Team</span>
+        <div class="switch" id="switch" hidden>
+            <label for="scope">Viewing</label>
+            <select id="scope" hidden></select>
+            <span class="team-static" id="scope-static" hidden></span>
+        </div>
+    </div>
+
+    <main class="wrap">
+        <div class="toolbar" id="toolbar" hidden>
+            <div class="summary" id="summary"></div>
+            <div class="spacer"></div>
+            <label class="toggle"><input type="checkbox" id="toggle-rejected"> Show rejected</label>
+            <button class="btn btn-ghost" id="refresh">↻ Refresh</button>
+        </div>
+
+        <!-- Views (one visible at a time) -->
+        <div class="state" id="view-loading">Loading your team's ads…</div>
+
+        <div class="card hidden" id="view-list">
+            <div class="tablewrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Ad</th>
+                            <th>Advertiser</th>
+                            <th>Placement</th>
+                            <th>Submitted</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rows"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card hidden" id="view-empty">
+            <div class="state">
+                <h2>No ads yet</h2>
+                <p id="empty-msg" class="muted">No ads have been submitted for your team yet.</p>
+                <a id="empty-link" href="#" target="_blank" rel="noopener">Submit an ad →</a>
+            </div>
+        </div>
+
+        <div class="card hidden" id="view-denied">
+            <div class="state">
+                <h2>Access not recognized</h2>
+                <p id="denied-msg" class="muted"></p>
+            </div>
+        </div>
+
+        <div class="card hidden" id="view-error">
+            <div class="state">
+                <h2>Something went wrong</h2>
+                <p class="muted">We couldn't load your team's ads.</p>
+                <button class="btn btn-ghost" id="retry">Try again</button>
+            </div>
+        </div>
+    </main>
+
+    <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
