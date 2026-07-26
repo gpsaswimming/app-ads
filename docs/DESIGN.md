@@ -806,7 +806,8 @@ default; transient states (`AWAITING_UPLOAD` / `VALIDATING`) are hidden; `REJECT
 **"Show rejected"** toggle that reveals the reason and a **"fix & resubmit"** link to the public form
 (resubmit = a new `Ad_ID`, per the §4 state machine).
 
-**UI.** Read-only single screen — one flat list with a **Team** column: **Team · Ad · Advertiser ·
+**UI.** Read-only single screen — the list is **grouped by team** (a team subheading, then that
+team's ads newest-first; teams alphabetical) for easy scanning. Columns: **Ad · Advertiser ·
 Placement · Submitted · Status badge** (Approved = green, Under review = amber, Rejected = red);
 responsive — table on desktop, cards on mobile. States: loading · empty · fetch error. Shared CDN
 CSS, Inter, brand colors, and the existing toast system, consistent with the submission form.
