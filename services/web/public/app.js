@@ -19,10 +19,20 @@
   const MAX_BYTES = 52428800; // 50 MB — friendly early guard; presign policy is the real gate
   const ALLOWED_TYPES = ['image/png', 'image/jpeg'];
 
+  // Aspect-ratio pre-check. Mirrors the server's authoritative check
+  // (ads-api/src/validation/dimensions.js + constants.js) so the two agree; the browser
+  // read is only a friendly early error, the server (sharp) remains the source of truth.
+  const PLACEMENT_ASPECT = {
+    FULL_SCREEN: { ratio: 9 / 4, name: 'full-screen', hint: '9:4' },
+    HALF_SCREEN: { ratio: 9 / 8, name: 'half-screen', hint: '9:8' },
+  };
+  const ASPECT_TOLERANCE = 0.02; // ±2%, matches ASPECT_TOLERANCE in the Ads API
+
   let turnstileToken = null;
   let turnstileWidgetId = null;
   let turnstileRendered = false;
   let submitting = false;
+  let aspectCheckSeq = 0; // guards against a stale async aspect result overwriting a newer one
 
   const $ = (id) => document.getElementById(id);
 
@@ -223,6 +233,59 @@
     return true;
   }
 
+  // ---- Aspect-ratio pre-check ----
+  // Read an image's natural aspect ratio in the browser. Resolves null if the file can't
+  // be decoded here (a broken/unsupported file) — in that case we defer to the server
+  // rather than block on a check we couldn't run.
+  function readAspectRatio(file) {
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        resolve(img.naturalWidth && img.naturalHeight ? img.naturalWidth / img.naturalHeight : null);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+      img.src = url;
+    });
+  }
+
+  // Quick, non-authoritative aspect check so an obviously mis-shaped image is caught before
+  // the submit + upload round-trip, instead of coming back later as a REJECTED email. The
+  // server re-checks with sharp and stays the source of truth. Returns an error string or null.
+  async function checkAspectRatio(file, placement) {
+    const spec = PLACEMENT_ASPECT[placement];
+    if (!file || !spec) return null;
+    const ratio = await readAspectRatio(file);
+    if (ratio == null) return null; // couldn't decode in-browser — let the server decide
+    const off = Math.abs(ratio - spec.ratio) / spec.ratio;
+    if (off > ASPECT_TOLERANCE) {
+      return `That image isn't the right shape for a ${spec.name} ad (it needs a ${spec.hint} aspect ratio). Please crop or re-export and try again.`;
+    }
+    return null;
+  }
+
+  // Show/hide the inline aspect warning under the dropzone.
+  function setAspectWarning(msg) {
+    const warn = $('aspect-warning');
+    if (!warn) return;
+    warn.textContent = msg || ''; // textContent — no user input here, but keep it structural
+    warn.classList.toggle('hidden', !msg);
+  }
+
+  // Re-run the aspect check whenever the file or placement changes, so a mis-shaped image is
+  // flagged the moment there's enough to check — no wait for submit. Needs both a file and a
+  // placement; clears otherwise. The seq guard drops a result that a newer change superseded.
+  async function updateAspectWarning() {
+    const file = $('artwork') && $('artwork').files[0] || null;
+    const placement = selectedPlacement();
+    if (!file || !placement) { setAspectWarning(''); return; }
+    const seq = ++aspectCheckSeq;
+    const msg = await checkAspectRatio(file, placement);
+    if (seq !== aspectCheckSeq) return; // a newer file/placement change already ran
+    setAspectWarning(msg);
+  }
+
   // ---- Two-step submit ----
   async function handleSubmit(e) {
     e.preventDefault();
@@ -230,6 +293,17 @@
 
     const data = collect();
     if (!validate(data)) return;
+
+    // Catch a mis-shaped image here rather than after the upload round-trip. Gate the
+    // button now so a double-click can't fire two submits during the async decode.
+    setSubmitting(true, 'Checking…');
+    const aspectError = await checkAspectRatio(data.file, data.placement);
+    if (aspectError) {
+      showToast(aspectError, 'error', 8000);
+      setSubmitting(false);
+      if ($('artwork')) $('artwork').focus();
+      return;
+    }
 
     setSubmitting(true, 'Submitting…');
 
@@ -393,6 +467,7 @@
     input.addEventListener('change', () => {
       const f = input.files[0];
       if (f) setFileSelected(f); else setFileEmpty();
+      updateAspectWarning();
     });
     ['dragenter', 'dragover'].forEach((ev) => dz.addEventListener(ev, (e) => {
       e.preventDefault(); dz.classList.add('dragover');
@@ -434,7 +509,7 @@
     $('submitter_is_advertiser').addEventListener('change', updateAdvertiserVisibility);
     $('team').addEventListener('change', updatePayment);
     document.querySelectorAll('input[name="placement"]').forEach((el) => {
-      el.addEventListener('change', () => { updatePlacementCards(); updatePayment(); });
+      el.addEventListener('change', () => { updatePlacementCards(); updatePayment(); updateAspectWarning(); });
     });
     $('ad-form').addEventListener('submit', handleSubmit);
     wireDropzone();
