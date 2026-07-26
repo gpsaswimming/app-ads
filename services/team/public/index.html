@@ -25,12 +25,8 @@
                   align-items: center; gap: 14px; flex-wrap: wrap; }
         .topbar img { height: 34px; width: auto; }
         .topbar .title { font-weight: 700; font-size: 1.05rem; letter-spacing: .2px; }
-        .topbar .switch { margin-left: auto; display: flex; align-items: center; gap: 8px; }
-        .topbar .switch label { font-size: .74rem; text-transform: uppercase; letter-spacing: .1em;
-                                color: #9fb3e0; }
-        select#scope { font-family: inherit; font-size: .9rem; font-weight: 600; color: var(--ink);
-                       background: #fff; border: 0; border-radius: 8px; padding: 7px 12px; cursor: pointer; }
-        .team-static { font-weight: 700; font-size: .95rem; }
+        .topbar .env { margin-left: auto; font-size: .72rem; text-transform: uppercase;
+                       letter-spacing: .12em; color: #9fb3e0; }
         .wrap { max-width: 72rem; margin: 0 auto; padding: 22px; }
 
         .toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
@@ -85,12 +81,8 @@
     <div class="topbar">
         <img src="https://assets.gpsaswimming.org/img/gpsa_logo.png" alt="GPSA"
              onerror="this.onerror=null;this.src='https://placehold.co/80x80/002366/FFFFFF?text=GPSA';">
-        <span class="title">Scoreboard Ads · Your Team</span>
-        <div class="switch" id="switch" hidden>
-            <label for="scope">Viewing</label>
-            <select id="scope" hidden></select>
-            <span class="team-static" id="scope-static" hidden></span>
-        </div>
+        <span class="title">Scoreboard Ads · Status</span>
+        <span class="env">City Meet 2026</span>
     </div>
 
     <main class="wrap">
@@ -109,6 +101,7 @@
                 <table>
                     <thead>
                         <tr>
+                            <th>Team</th>
                             <th>Ad</th>
                             <th>Advertiser</th>
                             <th>Placement</th>
@@ -124,15 +117,8 @@
         <div class="card hidden" id="view-empty">
             <div class="state">
                 <h2>No ads yet</h2>
-                <p id="empty-msg" class="muted">No ads have been submitted for your team yet.</p>
+                <p id="empty-msg" class="muted">No ads have been submitted yet.</p>
                 <a id="empty-link" href="#" target="_blank" rel="noopener">Submit an ad →</a>
-            </div>
-        </div>
-
-        <div class="card hidden" id="view-denied">
-            <div class="state">
-                <h2>Access not recognized</h2>
-                <p id="denied-msg" class="muted"></p>
             </div>
         </div>
 

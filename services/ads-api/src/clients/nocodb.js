@@ -66,16 +66,5 @@ export function createNocoClient({ url, token, tableId, fetchImpl = fetch }) {
       const data = await request('GET', `?limit=${Number(limit) || 1000}`);
       return data && Array.isArray(data.list) ? data.list : [];
     },
-
-    /**
-     * List Ads rows for a single affiliation (a team, or `GPSA`), for the team-facing view
-     * (§12). Parameterized `where` so the value is always data, never syntax. Status
-     * filtering + projection happen in the team handler (App tier); volume is tiny.
-     */
-    async listByTeam(team, { limit = 1000 } = {}) {
-      const where = encodeURIComponent(filterEq('Team', team));
-      const data = await request('GET', `?where=${where}&limit=${Number(limit) || 1000}`);
-      return data && Array.isArray(data.list) ? data.list : [];
-    },
   };
 }

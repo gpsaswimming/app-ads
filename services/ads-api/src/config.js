@@ -121,15 +121,6 @@ export function loadConfig(env = process.env) {
     gpsaCheckAddress: env.GPSA_CHECK_ADDRESS,
     submissionDeadlineMs: deadlineMs,
 
-    // Team ad view (§12). Optional/feature-gated: without NOCODB_REPS_TABLE_ID the
-    // /api/team/* endpoints return 503 and the core submission platform still boots.
-    // identityHeader must match the verified header the edge injects (client copies
-    // stripped) — lowercased to match Fastify's header keys.
-    team: Object.freeze({
-      repsTableId: env.NOCODB_REPS_TABLE_ID || null,
-      identityHeader: (env.TEAM_IDENTITY_HEADER || 'X-Forwarded-Email').toLowerCase(),
-    }),
-
     pricing: Object.freeze({
       FULL_SCREEN: priceFull,
       HALF_SCREEN: priceHalf,

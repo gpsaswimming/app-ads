@@ -253,14 +253,12 @@ boundary. Keeping internet egress out of the data tier is worth the extra hop.
 11. **Cleartext internal HTTP between tiers** so the inter-tier firewall can perform full DPI on
     inter-tier calls. TLS terminates at the edge only.
 12. **The `gpsa-ads` bucket is fully private** (no public ACL).
-13. **The team ad view is edge-authenticated and scope-authorized server-side** (§12). The team
-    origin (`team-ads.gpsaswimming.org`) sits entirely behind the edge's email auth; the edge
-    injects a verified identity header with client-supplied copies stripped. The Ads API trusts
-    that header only because it can't arrive any other way, resolves the caller's affiliations from
-    the `Reps` allowlist, and validates **every** requested scope against it — no cross-team view
-    exists. The public form origin **404s `/api/team/*`**, so the team API is reachable only through
-    the authenticated front. The view is **metadata only**: no artwork, payment, or submitter PII
-    (beyond the advertiser name) crosses this boundary.
+13. **The team status list is read-only, metadata-only, and on its own origin** (§12). The
+    `team-ads.gpsaswimming.org` origin (`app-ads-team`, zero creds) exposes only
+    `GET /api/team/ads` — a projection of ad **statuses**. No artwork, payment, or submitter PII
+    (beyond the advertiser business name) crosses it. It has **no app auth** (exposure is an
+    edge/deployment choice, like the VPN-only admin tool); the public form origin **404s
+    `/api/team/*`**, so the endpoint is reached only via the team origin.
 
 ---
 
@@ -311,20 +309,6 @@ boundary. Keeping internet egress out of the data tier is worth the extra hop.
 
 **Data minimization:** the artwork file is the artifact of record and lives only in object
 storage. The database holds queryable metadata + workflow state + a pointer (`Artwork_URI`).
-
-### NocoDB — Table: `Reps` (team ad view, §12)
-
-The authorization allowlist for the team-facing view. Operator-maintained (editable without a
-deploy); optional — the Ads API only reads it when `NOCODB_REPS_TABLE_ID` is set.
-
-| Field | Type | Notes |
-|---|---|---|
-| `Email` | Email | A team contact's login email. Matched case-insensitively against the edge-injected identity. |
-| `Affiliations` | MultiSelect | The affiliations this email may view — any of the 18 teams and/or `GPSA` (peer scopes). Multiple rows for one email are unioned. |
-
-Provisioned by `infrastructure/nocodb-setup.sh` (prints `NOCODB_REPS_TABLE_ID`). Only these two
-columns are read; the API validates each value against the known affiliations so a typo can't widen
-access.
 
 ### Object storage — bucket `gpsa-ads` (private)
 
@@ -780,75 +764,49 @@ Out of scope for the 2026 build; captured here so they aren't lost.
   open meets (each optionally with its own `SUBMISSION_DEADLINE`) + scoping the admin views by
   meet. No data migration required.
 
-### Team ad view (`team-ads.gpsaswimming.org`)
+### Team ad view (`team-ads.gpsaswimming.org`) — BUILT 2026-07-26
 
-A **read-only** page that lets a team see the City Meet ads affiliated with it — approved and
-in-review — so the operator stops fielding "did our ad get in?" emails. League accounts see
-GPSA-affiliation ads the same way. **Additive**: it reuses the existing Ads API, adds one NocoDB
-table and one DMZ front container, and never touches object storage.
+A **read-only status list** of every City Meet ad and where it stands (approved / under review /
+— on toggle — rejected), so the operator stops fielding "did our ad get in?" emails. **No app auth
+and no per-team scoping** — like the admin dashboard, whoever reaches the page gets the list.
+**Additive**: it reuses the existing Ads API and adds one DMZ front container; it never touches
+object storage and adds no NocoDB table.
 
 **Scope & non-goals.**
-- **Metadata only — no artwork, no object-storage exposure.** The page serves `Ads` fields from
-  NocoDB and never renders images, preserving the "no public GET on object storage" model (§1a,
-  §3 inv. 2). If teams ever need to *see* the artwork, that is a separate decision that reopens a
-  read path — out of scope here.
-- **Read-only.** No approve/edit/pay actions; review stays operator-side in NocoDB.
-- **No payment data** is surfaced (irrelevant to the team-facing view).
+- **Metadata only — no artwork, no object-storage exposure** (§1a, §3 inv 2). Serves `Ads` fields
+  from NocoDB; never renders images. Seeing the artwork is out of scope (it would reopen a read path).
+- **Read-only.** No approve/edit/pay and no per-ad detail view; review stays operator-side in NocoDB.
+- **No auth, no scoping.** Teams may see each other's ads — it is just status. Exposure is a
+  **deployment choice** at the edge (leave open, or put a lightweight gate in front), not app logic.
+- **No payment data or submitter PII** (beyond the advertiser business name) is surfaced.
 
 **Topology — separate origin, dedicated DMZ front.**
-- A new subdomain `team-ads.gpsaswimming.org` whose **entire surface** sits behind the edge's
-  email authentication. It is deliberately **not** a `/team` path on the public form origin: a
-  per-route auth carve-out would thread the auth boundary through shared containers (one
-  misconfigured route locks out the public form or leaks team data). A dedicated origin keeps the
-  submission form **100% public** and the team view **100% authenticated** — two clean boundaries.
-- A new DMZ front image **`app-ads-team`** (`ghcr.io/gpsaswimming/app-ads-team`): nginx serving the
-  static team UI and reverse-proxying `/api/team/*` to the App-tier Ads API. **Zero credentials**,
-  same pattern as `app-ads-web` / `app-ads-proxy`.
-- **Reuses** the App-tier **Ads API** (new `/api/team/*` endpoints) and **NocoDB** (new `Reps`
-  table); **does not touch object storage**. Net delta: **+1 DMZ container, +1 GHCR image, +
-  API endpoints, +1 NocoDB table.** No changes to existing components.
+- Subdomain `team-ads.gpsaswimming.org`, served by a new DMZ front image **`app-ads-team`**
+  (`ghcr.io/gpsaswimming/app-ads-team`): nginx serving the static list UI and reverse-proxying
+  `/api/team/*` to the App-tier Ads API. **Zero credentials**, same pattern as `app-ads-web` /
+  `app-ads-admin`.
+- Kept a **separate origin** (not a `/team` path on the public form) so the two sites stay clean and
+  independently deployable; the public form origin **404s `/api/team/*`**, so the status endpoint is
+  reached only through the team origin.
+- **Reuses** the App-tier **Ads API** (one new endpoint) and **NocoDB**; **no object storage, no new
+  table**. Net delta: **+1 DMZ container, +1 GHCR image, +1 API endpoint.**
 
-**Authentication & authorization.**
-- The edge authenticates the viewer's email and injects a **verified identity header**, stripping
-  any client-supplied copy so it cannot be spoofed. The Ads API trusts that header only because it
-  cannot arrive any other way.
-- Authorization data lives in a new NocoDB table **`Reps`** mapping an email → a **set of
-  affiliations** (the 18 teams and/or `GPSA`, as **peer scopes**). Operator-maintained, editable
-  without a deploy; seeded from the league contacts list.
-- The API derives the caller's authorized affiliations from the header email and **validates every
-  requested scope against that set** server-side. A client may request any affiliation but only
-  receives data for ones it is authorized for. **There is no cross-team / all-teams view** — each
-  scope shows exactly one affiliation's ads.
-- The public form front **must not** proxy `/api/team/*`; any `/api/team/*` request without a
-  verified identity header returns **401**. Belt-and-suspenders — the endpoints are reachable only
-  through the authenticated front.
+**Endpoint (added to the Ads API).**
+- `GET /api/team/ads[?include_rejected=true]` → every ad's status, newest first. No auth, no params
+  beyond the toggle. Default excludes `REJECTED` (and transient states); `include_rejected=true` adds
+  rejected ads with their reason.
 
-**Endpoints (added to the Ads API).**
-- `GET /api/team/scopes` → the affiliations the caller is authorized for; drives the switcher.
-- `GET /api/team/ads?team=<affiliation>` → that affiliation's ads. Default excludes `REJECTED`;
-  `?include_rejected=true` also returns rejected ads with their reason. **Authorization re-checked
-  on every call.**
+**Data returned** — a projection of the existing `Ads` table (no new fields): `Team`, `Ad_Title`,
+advertiser (`Company_Name` / `Advertiser_Name`), `Placement`, submitted date (`CreatedAt`), `Status`,
+and — for rejected rows — `Validation_Notes` as the reason. It **never** returns `Artwork_URI` /
+object keys, payment fields, or submitter PII beyond the advertiser name.
 
-**Data returned** — a projection of the existing `Ads` table (no new ad fields): `Ad_Title`,
-advertiser (`Company_Name` / `Advertiser_Name`), `Placement`, submitted date (`Created_At`),
-`Status`, and — for rejected rows when requested — `Validation_Notes` as the reason. It **never**
-returns `Artwork_URI` / object keys, payment fields, submitter PII beyond the advertiser name, or
-other affiliations' rows.
+**Status handling.** Shows `APPROVED` + `NEEDS_REVIEW` (labeled "Approved" / "Under review") by
+default; transient states (`AWAITING_UPLOAD` / `VALIDATING`) are hidden; `REJECTED` is hidden behind a
+**"Show rejected"** toggle that reveals the reason and a **"fix & resubmit"** link to the public form
+(resubmit = a new `Ad_ID`, per the §4 state machine).
 
-**Status handling.** Default view shows `APPROVED` + `NEEDS_REVIEW` (labeled "Approved" / "Under
-review"); `REJECTED` is hidden behind a **"Show rejected"** toggle (`include_rejected=true`) that
-reveals rejected rows with `Validation_Notes` as the reason and a **"fix & resubmit"** link to the
-public form (resubmit = a new `Ad_ID`, per the §4 state machine).
-
-**UI.** Read-only single screen. Header carries GPSA branding and an **affiliation switcher**
-populated from `/api/team/scopes` (single-scope accounts effectively have no picker). Rows show
-**Ad Title · Advertiser · Placement · Submitted · Status badge** (Approved = green, Under review =
-amber, Rejected = red); responsive — table on desktop, cards on mobile. States: loading · empty
-("no ads for {affiliation} yet" + link to the form) · **access-denied** (email not in `Reps`) ·
-fetch error. Uses the shared CDN CSS (`gpsa-ads.css`), Inter, brand colors, and the existing toast
-system, consistent with the submission form.
-
-**New security invariant (fold into §3 when built).** *The team origin is fully edge-authenticated;
-the Ads API authorizes every affiliation scope server-side against the `Reps` allowlist. The identity
-header is edge-verified with client copies stripped, and `/api/team/*` is unreachable without it. No
-artwork or payment data crosses this boundary.*
+**UI.** Read-only single screen — one flat list with a **Team** column: **Team · Ad · Advertiser ·
+Placement · Submitted · Status badge** (Approved = green, Under review = amber, Rejected = red);
+responsive — table on desktop, cards on mobile. States: loading · empty · fetch error. Shared CDN
+CSS, Inter, brand colors, and the existing toast system, consistent with the submission form.

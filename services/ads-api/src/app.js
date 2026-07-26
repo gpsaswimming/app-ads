@@ -49,10 +49,9 @@ export function buildApp(ctx, opts = {}) {
   app.post('/admin-api/ads/:adId/approve', admin.approve);
   app.post('/admin-api/ads/:adId/deny', admin.deny);
 
-  // /api/team/* — the team-facing ad view (§12). Read-only, metadata only. Served on the
-  // dedicated team-ads origin behind the edge's email auth; the API authorizes every scope
-  // against the Reps allowlist (handler inv 13). The public form front 404s this path.
-  app.get('/api/team/scopes', team.scopes);
+  // /api/team/ads — the team-facing ad status list (§12). Read-only, metadata only, no
+  // app auth (like /admin-api/*); served on the separate team-ads origin. The public form
+  // front 404s this path so the endpoint is reached only through the team origin.
   app.get('/api/team/ads', team.ads);
 
   return app;

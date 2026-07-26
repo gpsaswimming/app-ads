@@ -1,9 +1,8 @@
-/* Team-facing scoreboard-ads view (DESIGN.md §12). Read-only.
+/* Team-facing scoreboard-ads status list (DESIGN.md §12). Read-only.
  *
- * The whole origin sits behind the edge's email auth; this script just calls the
- * same-origin team API the edge fronts:
- *   GET /api/team/scopes                          → affiliations the caller may view
- *   GET /api/team/ads?team=<aff>[&include_rejected=true]
+ * No app auth and no per-team scoping — like the admin tool, you land on the page and get
+ * the list. It calls the same-origin, same-host team API:
+ *   GET /api/team/ads[?include_rejected=true]   → every ad's status, newest first
  *
  * Invariants honored here: all ad text is rendered with textContent (never innerHTML);
  * the page holds no secrets and makes no cross-origin calls.
@@ -15,9 +14,6 @@
   const $ = (id) => document.getElementById(id);
 
   const STATUS_LABEL = { APPROVED: 'Approved', NEEDS_REVIEW: 'Under review', REJECTED: 'Rejected' };
-
-  let scopes = [];
-  let currentScope = null;
 
   // ---- toasts (shared pattern with the submission form) ----
   function escapeHtml(s) {
@@ -41,24 +37,15 @@
   }
 
   // ---- view switching ----
-  const VIEWS = ['loading', 'list', 'empty', 'denied', 'error'];
+  const VIEWS = ['loading', 'list', 'empty', 'error'];
   function setView(id) {
     VIEWS.forEach((v) => {
       const el = $('view-' + v);
       if (el) el.classList.toggle('hidden', v !== id);
     });
-    // Toolbar + switcher belong to the data views only.
-    const dataView = id === 'list' || id === 'empty';
-    $('toolbar').hidden = !dataView;
-    $('switch').hidden = !dataView;
+    // Toolbar belongs to the data views only.
+    $('toolbar').hidden = !(id === 'list' || id === 'empty');
   }
-
-  function showDenied(message) {
-    $('denied-msg').textContent = message;
-    setView('denied');
-  }
-
-  const scopeLabel = (a) => (a === 'GPSA' ? 'GPSA (league-level)' : a);
 
   function formatDate(iso) {
     if (!iso) return '—';
@@ -68,55 +55,10 @@
   }
 
   // ---- data loading ----
-  async function loadScopes() {
-    setView('loading');
-    let res;
-    try {
-      res = await fetch('/api/team/scopes', { headers: { accept: 'application/json' } });
-    } catch {
-      return setView('error');
-    }
-    if (res.status === 401) return showDenied('You need to sign in to view your team\'s ads.');
-    if (res.status === 503) return showDenied('The team view isn\'t available yet. Please check back later.');
-    if (!res.ok) return setView('error');
-
-    const data = await res.json().catch(() => ({}));
-    scopes = Array.isArray(data.affiliations) ? data.affiliations : [];
-    if (scopes.length === 0) {
-      const who = data.email ? `${data.email} isn't` : 'This account isn\'t';
-      return showDenied(`${who} registered as a GPSA team contact. If you handle ads for a team, email ads@gpsaswimming.org to be added.`);
-    }
-    buildSwitcher();
-    currentScope = scopes[0];
-    loadAds();
-  }
-
-  function buildSwitcher() {
-    const select = $('scope');
-    const staticEl = $('scope-static');
-    if (scopes.length === 1) {
-      staticEl.textContent = scopeLabel(scopes[0]);
-      staticEl.hidden = false;
-      select.hidden = true;
-    } else {
-      select.innerHTML = '';
-      scopes.forEach((a) => {
-        const opt = document.createElement('option');
-        opt.value = a;
-        opt.textContent = scopeLabel(a); // textContent — affiliation is a fixed enum, escaped structurally
-        select.appendChild(opt);
-      });
-      select.hidden = false;
-      staticEl.hidden = true;
-    }
-  }
-
   async function loadAds() {
-    if (!currentScope) return;
     setView('loading');
     const includeRejected = $('toggle-rejected').checked;
-    const url = `/api/team/ads?team=${encodeURIComponent(currentScope)}`
-      + (includeRejected ? '&include_rejected=true' : '');
+    const url = '/api/team/ads' + (includeRejected ? '?include_rejected=true' : '');
 
     let res;
     try {
@@ -124,8 +66,6 @@
     } catch {
       return setView('error');
     }
-    if (res.status === 401) return showDenied('Your session expired. Refresh the page to sign in again.');
-    if (res.status === 403) { showToast('You\'re not authorized to view that team.', 'error', 6000); return; }
     if (!res.ok) return setView('error');
 
     const data = await res.json().catch(() => ({}));
@@ -135,7 +75,6 @@
   // ---- rendering ----
   function renderAds(ads) {
     if (ads.length === 0) {
-      $('empty-msg').textContent = `No ads have been submitted for ${scopeLabel(currentScope)} yet.`;
       $('empty-link').href = CONFIG.adsFormUrl || '#';
       setView('empty');
       return;
@@ -147,9 +86,8 @@
     if (counts.APPROVED) bits.push(`${counts.APPROVED} approved`);
     if (counts.NEEDS_REVIEW) bits.push(`${counts.NEEDS_REVIEW} under review`);
     if (counts.REJECTED) bits.push(`${counts.REJECTED} rejected`);
-    // Summary: structurally-escaped scope label + our own enum counts (no ad data).
-    $('summary').innerHTML = `<strong>${escapeHtml(scopeLabel(currentScope))}</strong> — `
-      + `${ads.length} ad${ads.length === 1 ? '' : 's'}`
+    // Summary is built from our own enum counts + fixed text — no ad data interpolated.
+    $('summary').textContent = `${ads.length} ad${ads.length === 1 ? '' : 's'}`
       + (bits.length ? ` · ${bits.join(' · ')}` : '');
 
     const tbody = $('rows');
@@ -161,6 +99,11 @@
   // Build a table row with textContent throughout (invariant: never innerHTML for ad data).
   function rowFor(a) {
     const tr = document.createElement('tr');
+
+    const teamTd = cell(a.team || '—');
+    teamTd.dataset.label = 'Team';
+    teamTd.classList.add('nowrap');
+    tr.appendChild(teamTd);
 
     const titleTd = document.createElement('td');
     titleTd.className = 'title';
@@ -210,11 +153,10 @@
 
   // ---- init ----
   function init() {
-    $('scope').addEventListener('change', (e) => { currentScope = e.target.value; loadAds(); });
     $('toggle-rejected').addEventListener('change', loadAds);
     $('refresh').addEventListener('click', loadAds);
-    $('retry').addEventListener('click', loadScopes);
-    loadScopes();
+    $('retry').addEventListener('click', loadAds);
+    loadAds();
   }
 
   if (document.readyState === 'loading') {
