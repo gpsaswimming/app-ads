@@ -253,12 +253,14 @@ boundary. Keeping internet egress out of the data tier is worth the extra hop.
 11. **Cleartext internal HTTP between tiers** so the inter-tier firewall can perform full DPI on
     inter-tier calls. TLS terminates at the edge only.
 12. **The `gpsa-ads` bucket is fully private** (no public ACL).
-13. **The team status list is read-only, metadata-only, and on its own origin** (§12). The
-    `team-ads.gpsaswimming.org` origin (`app-ads-team`, zero creds) exposes only
-    `GET /api/team/ads` — a projection of ad **statuses**. No artwork, payment, or submitter PII
-    (beyond the advertiser business name) crosses it. It has **no app auth** (exposure is an
+13. **The team status list is read-only and on its own origin** (§12). The
+    `team-ads.gpsaswimming.org` origin (`app-ads-team`, zero creds) exposes `GET /api/team/ads`
+    (ad statuses) and `GET /api/team/ads/:adId/artwork`, which **streams the image bytes through
+    the Ads API** — the bucket stays private (no public GET); the picture reaches the gated viewer
+    through this origin, exactly like the admin dashboard. No payment data or submitter PII (beyond
+    the advertiser business name) crosses it. It has **no app auth** (exposure is an
     edge/deployment choice, like the VPN-only admin tool); the public form origin **404s
-    `/api/team/*`**, so the endpoint is reached only via the team origin.
+    `/api/team/*`**, so the endpoints are reached only via the team origin.
 
 ---
 
@@ -773,11 +775,15 @@ and no per-team scoping** — like the admin dashboard, whoever reaches the page
 object storage and adds no NocoDB table.
 
 **Scope & non-goals.**
-- **Metadata only — no artwork, no object-storage exposure** (§1a, §3 inv 2). Serves `Ads` fields
-  from NocoDB; never renders images. Seeing the artwork is out of scope (it would reopen a read path).
-- **Read-only.** No approve/edit/pay and no per-ad detail view; review stays operator-side in NocoDB.
-- **No auth, no scoping.** Teams may see each other's ads — it is just status. Exposure is a
-  **deployment choice** at the edge (leave open, or put a lightweight gate in front), not app logic.
+- **Statuses + artwork viewing — no object-storage exposure** (§1a, §3 inv 2). Shows `Ads` metadata
+  and lets a viewer open the actual ad; the image is **streamed by the Ads API** (which holds the
+  storage creds), so the bucket stays private (no public GET) — never a direct storage URL. Same
+  mechanism as the admin dashboard's artwork preview.
+- **Read-only.** No approve/edit/pay; a viewer can open an ad's artwork but change nothing (review
+  stays operator-side in NocoDB).
+- **No auth, no scoping.** Teams may see each other's ads — it is just status + the artwork.
+  Exposure is a **deployment choice** at the edge (leave open, or put a lightweight gate in front),
+  not app logic.
 - **No payment data or submitter PII** (beyond the advertiser business name) is surfaced.
 
 **Topology — separate origin, dedicated DMZ front.**
@@ -791,15 +797,18 @@ object storage and adds no NocoDB table.
 - **Reuses** the App-tier **Ads API** (one new endpoint) and **NocoDB**; **no object storage, no new
   table**. Net delta: **+1 DMZ container, +1 GHCR image, +1 API endpoint.**
 
-**Endpoint (added to the Ads API).**
+**Endpoints (added to the Ads API).**
 - `GET /api/team/ads[?include_rejected=true]` → every ad's status, newest first. No auth, no params
   beyond the toggle. Default excludes `REJECTED` (and transient states); `include_rejected=true` adds
   rejected ads with their reason.
+- `GET /api/team/ads/:adId/artwork` → streams the ad's image bytes from storage (private bucket;
+  same as `admin.artwork`). 404 if the ad or its object is missing.
 
-**Data returned** — a projection of the existing `Ads` table (no new fields): `Team`, `Ad_Title`,
-advertiser (`Company_Name` / `Advertiser_Name`), `Placement`, submitted date (`CreatedAt`), `Status`,
-and — for rejected rows — `Validation_Notes` as the reason. It **never** returns `Artwork_URI` /
-object keys, payment fields, or submitter PII beyond the advertiser name.
+**Data returned** — a projection of the existing `Ads` table (no new fields): `ad_id` (the UUID, a
+handle for the artwork request), `Team`, `Ad_Title`, advertiser (`Company_Name` / `Advertiser_Name`),
+`Placement`, submitted date (`CreatedAt`), `Status`, a `has_artwork` flag, and — for rejected rows —
+`Validation_Notes` as the reason. It **never** returns `Artwork_URI` / object keys, payment fields, or
+submitter PII beyond the advertiser name.
 
 **Status handling.** Shows `APPROVED` + `NEEDS_REVIEW` (labeled "Approved" / "Under review") by
 default; transient states (`AWAITING_UPLOAD` / `VALIDATING`) are hidden; `REJECTED` is hidden behind a
@@ -808,6 +817,7 @@ default; transient states (`AWAITING_UPLOAD` / `VALIDATING`) are hidden; `REJECT
 
 **UI.** Read-only single screen — the list is **grouped by team** (a team subheading, then that
 team's ads newest-first; teams alphabetical) for easy scanning. Columns: **Ad · Advertiser ·
-Placement · Submitted · Status badge** (Approved = green, Under review = amber, Rejected = red);
-responsive — table on desktop, cards on mobile. States: loading · empty · fetch error. Shared CDN
+Placement · Submitted · Status badge** (Approved = green, Under review = amber, Rejected = red). An
+ad title with artwork is a link that opens the image in a **lightbox** (Esc / click-away to close).
+Responsive — table on desktop, cards on mobile. States: loading · empty · fetch error. Shared CDN
 CSS, Inter, brand colors, and the existing toast system, consistent with the submission form.

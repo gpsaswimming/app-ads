@@ -184,11 +184,13 @@ Read first: DESIGN.md §7 (domains / traffic model).
 ## Phase 7 — Team ad status list (`team-ads.gpsaswimming.org`) — DESIGN.md §12, §3 inv 13
 Read first: DESIGN.md §12 + §3 inv 13. Read-only, metadata-only, **no app auth, no per-team scoping**
 (like the admin tool). Reuses the Ads API + a DMZ front; **no object storage, no new NocoDB table.**
-- [x] Ads API: `/api/team/ads` handler (`handlers/team.js`) — lists ALL ads (safe projection with a
-      `Team` column), status filtering, `?include_rejected=true` toggle, newest first. No auth, no scopes.
-- [x] Tests: `test/team.test.js` (filtering, rejected toggle, order, PII/payment/artwork non-leak). Full suite green.
+- [x] Ads API (`handlers/team.js`): `/api/team/ads` lists ALL ads (safe projection incl. `ad_id` +
+      `has_artwork`), status filtering, `?include_rejected=true`, newest first; `/api/team/ads/:adId/artwork`
+      streams the image bytes (bucket stays private, same as `admin.artwork`). No auth, no scopes.
+- [x] Tests: `test/team.test.js` (filtering, rejected toggle, order, PII/payment/URI non-leak, has_artwork,
+      artwork stream + 404s). Full suite green.
 - [x] Front container `app-ads-team` (`services/team/`): static SPA (list grouped by team, Show-rejected
-      toggle, responsive cards) + nginx proxying `/api/team/*`; zero creds.
+      toggle, click-to-view artwork lightbox, responsive cards) + nginx proxying `/api/team/*`; zero creds.
 - [x] Public form front 404s `/api/team/*` (endpoint reached only via the team origin).
 - [x] CI matrix + DMZ compose service (`:8083`) + build override.
 - **Verify (deploy-time):** decide the origin's exposure at the edge (open, or a lightweight gate);

@@ -80,16 +80,44 @@ test('ads: reason is only exposed on rejected rows', async () => {
   assert.equal(approved.reason, '');
 });
 
-test('ads: projection never leaks PII / payment / artwork fields', async () => {
+test('ads: projection never leaks PII / payment / artwork URI', async () => {
   const { app } = appWith();
   const res = await app.inject({ method: 'GET', url: '/api/team/ads' });
   const ad = res.json().ads[0];
   assert.deepEqual(
     Object.keys(ad).sort(),
-    ['ad_title', 'advertiser', 'placement', 'reason', 'status', 'submitted_at', 'team'],
+    ['ad_id', 'ad_title', 'advertiser', 'has_artwork', 'placement', 'reason', 'status', 'submitted_at', 'team'],
   );
   const serialized = JSON.stringify(res.json());
   assert.ok(!serialized.includes('joe@example.com'), 'no submitter email');
   assert.ok(!serialized.includes('9000'), 'no payment amount');
-  assert.ok(!serialized.includes('s3://'), 'no artwork URI');
+  assert.ok(!serialized.includes('s3://'), 'no raw artwork URI (only a has_artwork flag)');
+});
+
+test('ads: has_artwork reflects whether an object is present', async () => {
+  const { app } = appWith();
+  const res = await app.inject({ method: 'GET', url: '/api/team/ads' });
+  const ads = res.json().ads;
+  assert.equal(ads.find((a) => a.ad_title === "Joe's Pizza").has_artwork, true);   // a1 has Artwork_URI
+  assert.equal(ads.find((a) => a.ad_title === 'Bay Dental').has_artwork, false);    // a2 has none
+});
+
+test('artwork: streams the object bytes for an ad that has one', async () => {
+  const { app } = appWith();
+  const res = await app.inject({ method: 'GET', url: '/api/team/ads/a1/artwork' });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers['cache-control'], 'private, no-store');
+  assert.ok(res.rawPayload.length > 0);
+});
+
+test('artwork: 404 for an unknown ad', async () => {
+  const { app } = appWith();
+  const res = await app.inject({ method: 'GET', url: '/api/team/ads/nope/artwork' });
+  assert.equal(res.statusCode, 404);
+});
+
+test('artwork: 404 when the ad has no uploaded object', async () => {
+  const { app } = appWith();
+  const res = await app.inject({ method: 'GET', url: '/api/team/ads/a2/artwork' });
+  assert.equal(res.statusCode, 404);
 });

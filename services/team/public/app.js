@@ -134,8 +134,18 @@
     const titleTd = document.createElement('td');
     titleTd.className = 'title';
     titleTd.dataset.label = 'Ad';
-    const t = document.createElement('div');
-    t.className = 't';
+    // If there's artwork, the title opens it in a lightbox; otherwise it's plain text.
+    let t;
+    if (a.has_artwork && a.ad_id) {
+      t = document.createElement('button');
+      t.type = 'button';
+      t.className = 't linklike';
+      t.title = 'View ad artwork';
+      t.addEventListener('click', () => openArtwork(a));
+    } else {
+      t = document.createElement('div');
+      t.className = 't';
+    }
     t.textContent = a.ad_title || '(untitled)';
     titleTd.appendChild(t);
     if (a.status === 'REJECTED' && a.reason) {
@@ -177,11 +187,29 @@
     return td;
   }
 
+  // ---- artwork lightbox ----
+  // The image is streamed by the API (bucket stays private), reached same-origin via the
+  // team front's /api/team/* proxy.
+  function openArtwork(a) {
+    const img = $('lightbox-img');
+    img.onerror = () => { closeLightbox(); showToast('Could not load that ad image.', 'error', 6000); };
+    img.src = `/api/team/ads/${encodeURIComponent(a.ad_id)}/artwork`;
+    $('lightbox-cap').textContent = `${a.team ? a.team + ' · ' : ''}${a.ad_title || ''}`;
+    $('lightbox').classList.add('open');
+  }
+  function closeLightbox() {
+    $('lightbox').classList.remove('open');
+    $('lightbox-img').removeAttribute('src');
+  }
+
   // ---- init ----
   function init() {
     $('toggle-rejected').addEventListener('change', loadAds);
     $('refresh').addEventListener('click', loadAds);
     $('retry').addEventListener('click', loadAds);
+    $('lightbox-close').addEventListener('click', closeLightbox);
+    $('lightbox').addEventListener('click', (e) => { if (e.target === $('lightbox')) closeLightbox(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeLightbox(); });
     loadAds();
   }
 
