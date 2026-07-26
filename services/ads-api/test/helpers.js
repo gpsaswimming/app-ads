@@ -32,20 +32,6 @@ export function fakeNoco() {
     async listAds() {
       return [...rows.values()];
     },
-    async listByTeam(team) {
-      return [...rows.values()].filter((r) => r.Team === team);
-    },
-  };
-}
-
-// Reps allowlist fake: map of email -> [affiliations], matched case-insensitively.
-export function fakeReps(map = {}) {
-  const data = new Map(Object.entries(map).map(([k, v]) => [k.toLowerCase(), v]));
-  return {
-    data,
-    async findAffiliationsByEmail(email) {
-      return data.get(String(email || '').trim().toLowerCase()) || [];
-    },
   };
 }
 
@@ -95,7 +81,6 @@ export function testConfig(overrides = {}) {
     meetName: '2026 City Meet',
     pricing: { FULL_SCREEN: 7500, HALF_SCREEN: 4000 },
     minio: { webhookSecret: 'test-webhook-secret' },
-    team: { identityHeader: 'x-forwarded-email' },
     ...overrides,
   };
 }
@@ -105,15 +90,12 @@ export function makeTestApp(overrides = {}) {
   const minio = overrides.minio || fakeMinio();
   const mailer = overrides.mailer || fakeMailer();
   const config = overrides.config || testConfig();
-  // Pass `reps: null` explicitly to simulate the feature being unconfigured.
-  const reps = overrides.reps === undefined ? fakeReps() : overrides.reps;
 
   const ctx = {
     config,
     verifyTurnstile: overrides.verifyTurnstile || (async () => true),
     validateSubmit: createSubmitValidator(MAX_BYTES),
     noco,
-    reps,
     minio,
     mailer,
     validateDimensions: overrides.validateDimensions || (async () => ({ ok: true, width: 2700, height: 1200, reason: null })),
@@ -121,7 +103,7 @@ export function makeTestApp(overrides = {}) {
   };
 
   const app = buildApp(ctx, { logger: false });
-  return { app, noco, reps, minio, mailer, config };
+  return { app, noco, minio, mailer, config };
 }
 
 export function validSubmitBody(overrides = {}) {

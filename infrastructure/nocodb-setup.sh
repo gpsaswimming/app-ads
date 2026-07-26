@@ -108,29 +108,6 @@ fi
 [ -n "$TABLE_ID" ] || { echo "error: could not create/find the Ads table" >&2; exit 1; }
 echo "   table id: ${TABLE_ID}"
 
-echo ">> finding or creating the Reps table (team ad view, DESIGN.md §12)"
-REPS_TABLE_ID="$(curl -s "$NC_URL/api/v2/meta/bases/$BASE_ID/tables" -H "xc-auth: $JWT" | pyfind "Reps")"
-if [ -z "$REPS_TABLE_ID" ]; then
-  REPS_TABLE_ID="$(curl -s -X POST "$NC_URL/api/v2/meta/bases/$BASE_ID/tables" -H "xc-auth: $JWT" \
-    -H 'Content-Type: application/json' --data-binary @- <<'JSON' | pyget id
-{
-  "title": "Reps",
-  "columns": [
-    { "title": "Email", "uidt": "Email" },
-    { "title": "Affiliations", "uidt": "MultiSelect", "colOptions": { "options": [
-      {"title":"Beaconsdale"},{"title":"Colony"},{"title":"Coventry"},{"title":"Elizabeth Lake"},
-      {"title":"Glendale"},{"title":"Hidenwood"},{"title":"James River"},{"title":"Kiln Creek"},
-      {"title":"Marlbank"},{"title":"Poquoson"},{"title":"Riverdale"},{"title":"Running Man"},
-      {"title":"Village Green"},{"title":"Warwick Yacht"},{"title":"Wendwood"},{"title":"Willow Oaks"},
-      {"title":"Windy Point"},{"title":"Wythe"},{"title":"GPSA"} ] } }
-  ]
-}
-JSON
-)"
-fi
-[ -n "$REPS_TABLE_ID" ] || { echo "error: could not create/find the Reps table" >&2; exit 1; }
-echo "   reps table id: ${REPS_TABLE_ID}"
-
 echo ">> minting an API token for the Ads API"
 API_TOKEN="$(curl -s -X POST "$NC_URL/api/v1/tokens" -H "xc-auth: $JWT" \
   -H 'Content-Type: application/json' -d '{"description":"ads-api"}' | pyget token)"
@@ -144,13 +121,7 @@ cat <<OUT
 NOCODB_URL=${NC_URL}
 NOCODB_BASE_ID=${BASE_ID}
 NOCODB_ADS_TABLE_ID=${TABLE_ID}
-NOCODB_REPS_TABLE_ID=${REPS_TABLE_ID}
 NOCODB_TOKEN=${API_TOKEN}
 ============================================================
  (Re-running mints an additional token; revoke unused ones in the NocoDB UI.)
-
- Team ad view (§12): NOCODB_REPS_TABLE_ID lights up /api/team/*. Leave it unset to keep
- that feature off (the API still boots). Seed the Reps table with each team contact's
- Email + the Affiliations (teams and/or GPSA) they may view; the edge must inject the
- verified identity header the API reads (TEAM_IDENTITY_HEADER, default X-Forwarded-Email).
 OUT
