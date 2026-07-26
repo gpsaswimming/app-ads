@@ -49,10 +49,12 @@ export function buildApp(ctx, opts = {}) {
   app.post('/admin-api/ads/:adId/approve', admin.approve);
   app.post('/admin-api/ads/:adId/deny', admin.deny);
 
-  // /api/team/ads — the team-facing ad status list (§12). Read-only, metadata only, no
-  // app auth (like /admin-api/*); served on the separate team-ads origin. The public form
-  // front 404s this path so the endpoint is reached only through the team origin.
+  // /api/team/* — the team-facing ad status list (§12). Read-only, no app auth (like
+  // /admin-api/*); served on the separate team-ads origin. The public form front 404s this
+  // path so it's reached only through the team origin. Artwork bytes are streamed through
+  // the API (bucket stays private).
   app.get('/api/team/ads', team.ads);
+  app.get('/api/team/ads/:adId/artwork', team.artwork);
 
   return app;
 }

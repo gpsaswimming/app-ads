@@ -1,10 +1,13 @@
-// /api/team/* — the team-facing ad status list (DESIGN.md §12). Read-only, metadata only:
-// a flat list of every ad's status across all teams. No app-level auth and no per-team
-// scoping — like the admin tool, you land on the page and get the list. Exposure is a
-// deployment choice (edge/network), not app logic. It never touches object storage and
-// returns no payment data or submitter PII beyond the advertiser business name.
+// /api/team/* — the team-facing ad status list (DESIGN.md §12). Read-only, no app-level
+// auth and no per-team scoping — like the admin tool, you land on the page and get the
+// list. Exposure is a deployment choice (edge/network), not app logic.
+//
+// Artwork: teams can view the actual ad. The image bytes are STREAMED THROUGH THE API
+// (which holds the storage creds) exactly like the admin dashboard — the bucket stays
+// private (no public GET), the picture just reaches the gated viewer through this origin.
 
 import { STATUS } from '../constants.js';
+import { keyFromUri } from '../clients/minio.js';
 
 // Statuses shown. Transient in-flight states (AWAITING_UPLOAD / UPLOADED / VALIDATING) are
 // hidden — they resolve within seconds and would only confuse. REJECTED is hidden unless
@@ -13,9 +16,10 @@ const DEFAULT_VISIBLE = new Set([STATUS.APPROVED, STATUS.NEEDS_REVIEW]);
 const WITH_REJECTED = new Set([STATUS.APPROVED, STATUS.NEEDS_REVIEW, STATUS.REJECTED]);
 
 /** Project a NocoDB Ads row to the minimal, safe shape the status list renders. */
-function toTeamAd(row) {
+function toTeamAd(row, bucket) {
   const isRejected = row.Status === STATUS.REJECTED;
   return {
+    ad_id: row.Ad_ID,
     team: row.Team || null,
     ad_title: row.Ad_Title || '',
     advertiser: row.Company_Name || row.Advertiser_Name || '',
@@ -24,11 +28,13 @@ function toTeamAd(row) {
     status: row.Status || null,
     // Reason is only meaningful for — and only ever exposed on — rejected ads.
     reason: isRejected ? (row.Validation_Notes || '') : '',
+    // Whether there's an image to view (drives the "view ad" affordance).
+    has_artwork: Boolean(keyFromUri(row.Artwork_URI, bucket)),
   };
 }
 
 export function makeTeamHandlers(ctx) {
-  const { noco } = ctx;
+  const { noco, minio } = ctx;
 
   /** GET /api/team/ads[?include_rejected=true] — every ad's status, newest first. */
   async function ads(request, reply) {
@@ -38,10 +44,25 @@ export function makeTeamHandlers(ctx) {
     const rows = await noco.listAds({ limit: 1000 });
     const list = rows
       .filter((r) => visible.has(r.Status))
-      .map(toTeamAd)
+      .map((r) => toTeamAd(r, minio.bucket))
       .sort((a, b) => String(b.submitted_at || '').localeCompare(String(a.submitted_at || '')));
     return reply.send({ ads: list });
   }
 
-  return { ads };
+  /** GET /api/team/ads/:adId/artwork — stream the current object bytes for viewing. */
+  async function artwork(request, reply) {
+    const row = await noco.findByAdId(request.params.adId);
+    if (!row) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const key = keyFromUri(row.Artwork_URI, minio.bucket);
+    if (!key) return reply.code(404).send({ error: 'NO_ARTWORK' });
+
+    const buffer = await minio.getObjectBuffer(key);
+    return reply
+      .header('Cache-Control', 'private, no-store')
+      .type(row.Content_Type || 'application/octet-stream')
+      .send(buffer);
+  }
+
+  return { ads, artwork };
 }

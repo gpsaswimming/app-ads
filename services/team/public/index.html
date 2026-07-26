@@ -48,6 +48,22 @@
         tbody tr:last-child td { border-bottom: 0; }
         td.title .t { font-weight: 600; }
         td.title .reason { color: var(--red-hi); font-size: .8rem; margin-top: 3px; }
+        .linklike { background: none; border: 0; padding: 0; font: inherit; font-weight: 600;
+                    color: var(--navy-hi); cursor: pointer; text-align: left; }
+        .linklike:hover { text-decoration: underline; }
+
+        /* Artwork lightbox */
+        .lightbox { position: fixed; inset: 0; background: rgba(10,18,40,.82); z-index: 60;
+                    display: none; align-items: center; justify-content: center; padding: 24px; }
+        .lightbox.open { display: flex; }
+        .lightbox-inner { position: relative; max-width: 92vw; max-height: 90vh; }
+        .lightbox img { max-width: 92vw; max-height: 84vh; border-radius: 8px; display: block;
+                        background: #0c1430; }
+        .lightbox-close { position: absolute; top: -14px; right: -14px; width: 34px; height: 34px;
+                          border-radius: 999px; border: 0; background: #fff; color: var(--ink);
+                          font-size: 1.3rem; line-height: 1; cursor: pointer;
+                          box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+        .lightbox-cap { color: #cdd8f0; text-align: center; margin-top: 10px; font-size: .85rem; }
         .nowrap { white-space: nowrap; }
         .muted { color: var(--mut); }
 
@@ -135,6 +151,14 @@
             </div>
         </div>
     </main>
+
+    <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Ad artwork">
+        <div class="lightbox-inner">
+            <button class="lightbox-close" id="lightbox-close" aria-label="Close">×</button>
+            <img id="lightbox-img" alt="Ad artwork">
+            <div class="lightbox-cap" id="lightbox-cap"></div>
+        </div>
+    </div>
 
     <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
 
