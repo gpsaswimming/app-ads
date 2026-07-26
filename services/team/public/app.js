@@ -90,20 +90,46 @@
     $('summary').textContent = `${ads.length} ad${ads.length === 1 ? '' : 's'}`
       + (bits.length ? ` · ${bits.join(' · ')}` : '');
 
+    // Group by team for readability — a team subheading, then that team's ads (newest first,
+    // preserved from the API order). Teams are listed alphabetically.
+    const groups = new Map();
+    ads.forEach((a) => {
+      const key = a.team || '—';
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(a);
+    });
+
     const tbody = $('rows');
     tbody.innerHTML = '';
-    ads.forEach((a) => tbody.appendChild(rowFor(a)));
+    [...groups.keys()].sort((x, y) => x.localeCompare(y)).forEach((team) => {
+      const rows = groups.get(team);
+      tbody.appendChild(groupHeader(team, rows.length));
+      rows.forEach((a) => tbody.appendChild(rowFor(a)));
+    });
     setView('list');
   }
 
+  // A full-width team subheading row.
+  function groupHeader(team, n) {
+    const tr = document.createElement('tr');
+    tr.className = 'group';
+    const td = document.createElement('td');
+    td.colSpan = 5;
+    const label = document.createElement('span');
+    label.textContent = team; // textContent — team is enum-ish, escaped structurally
+    const count = document.createElement('span');
+    count.className = 'n';
+    count.textContent = String(n);
+    td.appendChild(label);
+    td.appendChild(count);
+    tr.appendChild(td);
+    return tr;
+  }
+
   // Build a table row with textContent throughout (invariant: never innerHTML for ad data).
+  // Team is the group subheading, not a per-row cell.
   function rowFor(a) {
     const tr = document.createElement('tr');
-
-    const teamTd = cell(a.team || '—');
-    teamTd.dataset.label = 'Team';
-    teamTd.classList.add('nowrap');
-    tr.appendChild(teamTd);
 
     const titleTd = document.createElement('td');
     titleTd.className = 'title';

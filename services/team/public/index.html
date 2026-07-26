@@ -51,6 +51,10 @@
         .nowrap { white-space: nowrap; }
         .muted { color: var(--mut); }
 
+        tr.group td { background: #eef2fb; color: var(--navy); font-weight: 700; font-size: .78rem;
+                      text-transform: uppercase; letter-spacing: .06em; padding: 9px 16px; }
+        tr.group .n { opacity: .6; font-weight: 600; margin-left: 7px; }
+
         .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: .72rem;
                  font-weight: 700; letter-spacing: .02em; white-space: nowrap; }
         .b-APPROVED { background: #dcf3e8; color: #0e6e4a; }
@@ -74,6 +78,8 @@
                          text-transform: uppercase; letter-spacing: .06em; font-weight: 600; flex: 0 0 auto; }
             td.title { flex-direction: column; }
             td.title::before { content: ""; display: none; }
+            tr.group td { display: block; }
+            tr.group td::before { display: none; }
         }
     </style>
 </head>
@@ -101,7 +107,6 @@
                 <table>
                     <thead>
                         <tr>
-                            <th>Team</th>
                             <th>Ad</th>
                             <th>Advertiser</th>
                             <th>Placement</th>

@@ -187,8 +187,8 @@ Read first: DESIGN.md §12 + §3 inv 13. Read-only, metadata-only, **no app auth
 - [x] Ads API: `/api/team/ads` handler (`handlers/team.js`) — lists ALL ads (safe projection with a
       `Team` column), status filtering, `?include_rejected=true` toggle, newest first. No auth, no scopes.
 - [x] Tests: `test/team.test.js` (filtering, rejected toggle, order, PII/payment/artwork non-leak). Full suite green.
-- [x] Front container `app-ads-team` (`services/team/`): static SPA (flat list, Show-rejected toggle,
-      responsive cards) + nginx proxying `/api/team/*`; zero creds.
+- [x] Front container `app-ads-team` (`services/team/`): static SPA (list grouped by team, Show-rejected
+      toggle, responsive cards) + nginx proxying `/api/team/*`; zero creds.
 - [x] Public form front 404s `/api/team/*` (endpoint reached only via the team origin).
 - [x] CI matrix + DMZ compose service (`:8083`) + build override.
 - **Verify (deploy-time):** decide the origin's exposure at the edge (open, or a lightweight gate);
