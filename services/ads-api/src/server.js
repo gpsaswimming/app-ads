@@ -5,6 +5,7 @@ import { buildApp } from './app.js';
 import { createGeminiChecker } from './clients/gemini.js';
 import { createMinioClients } from './clients/minio.js';
 import { createNocoClient } from './clients/nocodb.js';
+import { createRepsClient } from './clients/reps.js';
 import { createTurnstileVerifier } from './clients/turnstile.js';
 import { loadConfig } from './config.js';
 import { createMailer } from './email/mailer.js';
@@ -25,6 +26,15 @@ const ctx = {
   verifyTurnstile: createTurnstileVerifier(config.turnstile),
   validateSubmit: createSubmitValidator(config.minio.maxUploadBytes),
   noco: createNocoClient(config.nocodb),
+  // Team ad view (§12): only wired when a Reps table is provisioned; otherwise the
+  // /api/team/* endpoints report 503 (feature not configured).
+  reps: config.team.repsTableId
+    ? createRepsClient({
+        url: config.nocodb.url,
+        token: config.nocodb.token,
+        tableId: config.team.repsTableId,
+      })
+    : null,
   minio: createMinioClients(config.minio),
   mailer: createMailer({
     smtpUrl: config.smtp.url,

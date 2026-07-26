@@ -10,6 +10,8 @@ services:
     build: ../services/web
   minio-proxy:
     build: ../services/proxy
+  team:
+    build: ../services/team
   ads-api:
     build: ../services/ads-api
   admin:

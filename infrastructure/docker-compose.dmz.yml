@@ -26,6 +26,13 @@ services:
     ports:
       - "8082:8080"   # edge → ads-upload.gpsaswimming.org (POST /gpsa-ads only)
 
+  team:
+    image: ghcr.io/gpsaswimming/app-ads-team:latest
+    restart: unless-stopped
+    env_file: ./team.env
+    ports:
+      - "8083:8080"   # edge → team-ads.gpsaswimming.org (BEHIND the edge's email auth)
+
   minio:
     image: minio/minio:latest
     restart: unless-stopped
