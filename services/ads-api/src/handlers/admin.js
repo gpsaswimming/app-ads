@@ -8,6 +8,8 @@
 
 import { STATUS } from '../constants.js';
 import { keyFromUri } from '../clients/minio.js';
+import { buildTreasurerReport } from '../reports/treasurer.js';
+import { renderTreasurerPdf, treasurerPdfFilename } from '../reports/treasurer-pdf.js';
 
 /** Project a NocoDB row to the fields the dashboard shows. VPN-only, but stay tidy. */
 function toSummary(row, bucket) {
@@ -125,5 +127,26 @@ export function makeAdminHandlers(ctx) {
     return reply.send({ ad: toSummary(row, bucket) });
   }
 
-  return { list, artwork, approve, deny };
+  /**
+   * GET /admin-api/treasurer.pdf — the treasurer report, as a PDF download.
+   *
+   * A print-ready document, not a screen: page 1 is the league summary (a row per team, the
+   * amount due highlighted, grand total at the foot), then one page per team listing that
+   * team's ads with each amount and the total due. Generated here because this is the tier
+   * that can read NocoDB; the dashboard just links to it.
+   */
+  async function treasurerPdf(request, reply) {
+    const rows = await noco.listAds({ limit: 1000 });
+    const report = buildTreasurerReport(rows, { meet: ctx.config?.meetName || null });
+    const pdf = await renderTreasurerPdf(report);
+
+    log.info({ teams: report.teams.length, dueCents: report.totals.gpsa_due_cents }, 'treasurer report generated');
+    return reply
+      .header('content-disposition', `attachment; filename="${treasurerPdfFilename(report)}"`)
+      .header('cache-control', 'private, no-store')
+      .type('application/pdf')
+      .send(pdf);
+  }
+
+  return { list, artwork, approve, deny, treasurerPdf };
 }

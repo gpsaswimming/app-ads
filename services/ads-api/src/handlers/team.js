@@ -6,6 +6,7 @@
 // (which holds the storage creds) exactly like the admin dashboard — the bucket stays
 // private (no public GET), the picture just reaches the gated viewer through this origin.
 
+import { amountCents, gpsaDueCents } from '../billing.js';
 import { STATUS } from '../constants.js';
 import { keyFromUri } from '../clients/minio.js';
 
@@ -18,9 +19,6 @@ const WITH_REJECTED = new Set([STATUS.APPROVED, STATUS.NEEDS_REVIEW, STATUS.REJE
 /** Project a NocoDB Ads row to the minimal, safe shape the status list renders. */
 function toTeamAd(row, bucket) {
   const isRejected = row.Status === STATUS.REJECTED;
-  const isApproved = row.Status === STATUS.APPROVED;
-  const amount = typeof row.Payment_Amount === 'number' ? row.Payment_Amount : null;
-  const isTeamAffiliation = Boolean(row.Team) && row.Team !== 'GPSA';
   return {
     ad_id: row.Ad_ID,
     team: row.Team || null,
@@ -34,11 +32,10 @@ function toTeamAd(row, bucket) {
     // Whether there's an image to view (drives the "view ad" affordance).
     has_artwork: Boolean(keyFromUri(row.Artwork_URI, bucket)),
     // Full ad price (cents). Not shown for rejected ads — they won't run / aren't charged.
-    price_cents: isRejected ? null : amount,
-    // What this ad contributes to the team's "due to GPSA": half of an APPROVED,
-    // team-affiliated ad (50/50 split, PAY_TEAM). GPSA-affiliation ads are paid to GPSA
-    // directly, so they owe nothing here.
-    gpsa_due_cents: isApproved && isTeamAffiliation && amount ? Math.round(amount / 2) : 0,
+    price_cents: isRejected ? null : amountCents(row),
+    // What this ad contributes to the team's "due to GPSA" (50/50 split, PAY_TEAM) —
+    // the shared rule in billing.js, same one the treasurer report totals.
+    gpsa_due_cents: gpsaDueCents(row),
   };
 }
 
