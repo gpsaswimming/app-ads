@@ -6,15 +6,10 @@
 // the sole credential holder (DESIGN.md §3 inv 4) — the dashboard holds zero creds and
 // goes through here for everything (NocoDB reads, artwork bytes, the approve rename).
 
-import { amountCents, gpsaDueCents, isTeamAffiliated } from '../billing.js';
 import { STATUS } from '../constants.js';
 import { keyFromUri } from '../clients/minio.js';
-
-// Statuses the treasurer report accounts for. APPROVED ads are billable; NEEDS_REVIEW ads
-// are carried alongside as "could still land" so a report read mid-season isn't misleading.
-// Rejected and in-flight ads (AWAITING_UPLOAD / VALIDATING) are money that does not exist.
-const BILLABLE = STATUS.APPROVED;
-const PENDING = STATUS.NEEDS_REVIEW;
+import { buildTreasurerReport } from '../reports/treasurer.js';
+import { renderTreasurerPdf, treasurerPdfFilename } from '../reports/treasurer-pdf.js';
 
 /** Project a NocoDB row to the fields the dashboard shows. VPN-only, but stay tidy. */
 function toSummary(row, bucket) {
@@ -44,72 +39,6 @@ function toSummary(row, bucket) {
     payment_status: row.Payment_Status,
     has_artwork: Boolean(keyFromUri(row.Artwork_URI, bucket)),
   };
-}
-
-/** One line of a team's page on the treasurer report. */
-function toLine(row) {
-  return {
-    ad_id: row.Ad_ID,
-    submitted_at: row.CreatedAt ?? null,
-    status: row.Status,
-    company_name: row.Company_Name || '',
-    ad_title: row.Ad_Title || '',
-    placement: row.Placement || null,
-    payment_method: row.Payment_Method || null,
-    payment_status: row.Payment_Status || null,
-    // What the advertiser owes for the ad …
-    amount_cents: amountCents(row),
-    // … and the slice of it the team remits to GPSA (0 until the ad is approved).
-    gpsa_due_cents: gpsaDueCents(row),
-  };
-}
-
-/** A fresh per-affiliation accumulator. `team` is a team name or `GPSA`. */
-function newGroup(team) {
-  return {
-    team,
-    is_gpsa: team === 'GPSA',
-    full_count: 0,
-    half_count: 0,
-    ad_count: 0,
-    // Approved ads only — what the advertisers owe in total for this affiliation.
-    gross_cents: 0,
-    // Team → GPSA remittance (50% of approved). Always 0 for the GPSA group.
-    gpsa_due_cents: 0,
-    // The half the team keeps. Always 0 for the GPSA group.
-    team_keeps_cents: 0,
-    // Approved ads the advertiser has not settled yet (Payment_Status other than
-    // PAID/WAIVED) — the treasurer's chase list. Does not reduce gpsa_due_cents.
-    unpaid_count: 0,
-    unpaid_cents: 0,
-    // Still under review: not counted anywhere above, shown so the report reads honestly
-    // mid-season ("three more could still land").
-    pending_count: 0,
-    pending_cents: 0,
-    ads: [],
-  };
-}
-
-function addToGroup(group, row) {
-  const line = toLine(row);
-  group.ads.push(line);
-
-  if (row.Status === PENDING) {
-    group.pending_count += 1;
-    group.pending_cents += line.amount_cents || 0;
-    return;
-  }
-
-  group.ad_count += 1;
-  if (row.Placement === 'FULL_SCREEN') group.full_count += 1;
-  else if (row.Placement === 'HALF_SCREEN') group.half_count += 1;
-  group.gross_cents += line.amount_cents || 0;
-  group.gpsa_due_cents += line.gpsa_due_cents;
-  if (isTeamAffiliated(row)) group.team_keeps_cents += (line.amount_cents || 0) - line.gpsa_due_cents;
-  if (row.Payment_Status !== 'PAID' && row.Payment_Status !== 'WAIVED') {
-    group.unpaid_count += 1;
-    group.unpaid_cents += line.amount_cents || 0;
-  }
 }
 
 export function makeAdminHandlers(ctx) {
@@ -199,60 +128,25 @@ export function makeAdminHandlers(ctx) {
   }
 
   /**
-   * GET /admin-api/treasurer — what each team owes GPSA (docs/TODO.md #1).
+   * GET /admin-api/treasurer.pdf — the treasurer report, as a PDF download.
    *
-   * One payload serves both screens: a per-affiliation summary (full/half counts + the
-   * highlighted amount due) and, in `ads`, the per-team detail page. Volume is dozens of
-   * rows per season, so a second round-trip per team would buy nothing. The split rule
-   * lives in billing.js — the browser never recomputes money.
+   * A print-ready document, not a screen: page 1 is the league summary (a row per team, the
+   * amount due highlighted, grand total at the foot), then one page per team listing that
+   * team's ads with each amount and the total due. Generated here because this is the tier
+   * that can read NocoDB; the dashboard just links to it.
    */
-  async function treasurer(request, reply) {
+  async function treasurerPdf(request, reply) {
     const rows = await noco.listAds({ limit: 1000 });
+    const report = buildTreasurerReport(rows, { meet: ctx.config?.meetName || null });
+    const pdf = await renderTreasurerPdf(report);
 
-    const groups = new Map();
-    for (const row of rows) {
-      if (row.Status !== BILLABLE && row.Status !== PENDING) continue;
-      const key = row.Team || 'Unassigned';
-      if (!groups.has(key)) groups.set(key, newGroup(key));
-      addToGroup(groups.get(key), row);
-    }
-
-    // Teams alphabetically; the GPSA (league) group last — it's a different kind of line
-    // (collected directly, nobody owes it), so it reads as a footnote to the team list.
-    const teams = [...groups.values()].sort((a, b) => (
-      a.is_gpsa - b.is_gpsa || a.team.localeCompare(b.team)
-    ));
-    for (const g of teams) {
-      g.ads.sort((a, b) => String(b.submitted_at || '').localeCompare(String(a.submitted_at || '')));
-    }
-
-    const totals = teams.reduce((t, g) => ({
-      team_count: t.team_count + (g.is_gpsa ? 0 : 1),
-      full_count: t.full_count + g.full_count,
-      half_count: t.half_count + g.half_count,
-      ad_count: t.ad_count + g.ad_count,
-      gross_cents: t.gross_cents + g.gross_cents,
-      // The bottom line: what GPSA is owed by the teams.
-      gpsa_due_cents: t.gpsa_due_cents + g.gpsa_due_cents,
-      // League-affiliation ads, billed to the advertiser by GPSA itself.
-      gpsa_direct_cents: t.gpsa_direct_cents + (g.is_gpsa ? g.gross_cents : 0),
-      unpaid_count: t.unpaid_count + g.unpaid_count,
-      unpaid_cents: t.unpaid_cents + g.unpaid_cents,
-      pending_count: t.pending_count + g.pending_count,
-      pending_cents: t.pending_cents + g.pending_cents,
-    }), {
-      team_count: 0, full_count: 0, half_count: 0, ad_count: 0, gross_cents: 0,
-      gpsa_due_cents: 0, gpsa_direct_cents: 0, unpaid_count: 0, unpaid_cents: 0,
-      pending_count: 0, pending_cents: 0,
-    });
-
-    return reply.send({
-      meet: ctx.config?.meetName || null,
-      generated_at: new Date().toISOString(),
-      teams,
-      totals,
-    });
+    log.info({ teams: report.teams.length, dueCents: report.totals.gpsa_due_cents }, 'treasurer report generated');
+    return reply
+      .header('content-disposition', `attachment; filename="${treasurerPdfFilename(report)}"`)
+      .header('cache-control', 'private, no-store')
+      .type('application/pdf')
+      .send(pdf);
   }
 
-  return { list, artwork, approve, deny, treasurer };
+  return { list, artwork, approve, deny, treasurerPdf };
 }

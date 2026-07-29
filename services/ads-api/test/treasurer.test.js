@@ -1,10 +1,15 @@
-// GET /admin-api/treasurer — the per-team money report (docs/TODO.md #1).
-// Rows are seeded straight into the fake NocoDB so each case pins one billing rule
-// (status, affiliation, placement, payment status) without driving the whole intake flow.
+// Treasurer report — the aggregation (reports/treasurer.js) and the PDF download
+// (GET /admin-api/treasurer.pdf). docs/TODO.md #1.
+//
+// The arithmetic is tested directly on plain `Ads` rows so each case pins one billing rule
+// (status, affiliation, placement, payment status); the endpoint tests cover the download
+// itself — headers, filename, and that a page really is emitted per team.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { buildTreasurerReport } from '../src/reports/treasurer.js';
+import { renderTreasurerPdf, treasurerPdfFilename } from '../src/reports/treasurer-pdf.js';
 import { makeTestApp } from './helpers.js';
 
 const FULL = 9000;
@@ -12,10 +17,10 @@ const HALF = 5000;
 
 let seq = 0;
 
-/** Seed one Ads row. Defaults: an approved, team-affiliated, unpaid full-screen ad. */
-function ad(noco, overrides = {}) {
+/** One Ads row. Defaults: an approved, team-affiliated, unpaid full-screen ad. */
+function row(overrides = {}) {
   seq += 1;
-  return noco.createAd({
+  return {
     Ad_ID: `ad-${seq}`,
     CreatedAt: `2026-07-${String(10 + seq).padStart(2, '0')}T12:00:00Z`,
     Status: 'APPROVED',
@@ -27,25 +32,22 @@ function ad(noco, overrides = {}) {
     Payment_Amount: FULL,
     Payment_Status: 'PENDING',
     ...overrides,
-  });
+  };
 }
 
-async function report(app) {
-  const res = await app.inject({ method: 'GET', url: '/admin-api/treasurer' });
-  assert.equal(res.statusCode, 200);
-  return res.json();
-}
-
+const report = (rows) => buildTreasurerReport(rows, { meet: '2026 City Meet' });
 const byTeam = (data, team) => data.teams.find((t) => t.team === team);
 
-test('summarizes full/half counts per team and owes GPSA half of each approved ad', async () => {
-  const { app, noco } = makeTestApp();
-  await ad(noco, { Team: 'Glendale', Placement: 'FULL_SCREEN', Payment_Amount: FULL });
-  await ad(noco, { Team: 'Glendale', Placement: 'HALF_SCREEN', Payment_Amount: HALF });
-  await ad(noco, { Team: 'Glendale', Placement: 'HALF_SCREEN', Payment_Amount: HALF });
-  await ad(noco, { Team: 'Poquoson', Placement: 'FULL_SCREEN', Payment_Amount: FULL });
+/** PDF page objects are plain in the file structure even when content streams are compressed. */
+const pageCount = (buf) => buf.toString('latin1').match(/\/Type\s*\/Page[^s]/g).length;
 
-  const data = await report(app);
+test('summarizes full/half counts per team and owes GPSA half of each approved ad', () => {
+  const data = report([
+    row({ Team: 'Glendale', Placement: 'FULL_SCREEN', Payment_Amount: FULL }),
+    row({ Team: 'Glendale', Placement: 'HALF_SCREEN', Payment_Amount: HALF }),
+    row({ Team: 'Glendale', Placement: 'HALF_SCREEN', Payment_Amount: HALF }),
+    row({ Team: 'Poquoson', Placement: 'FULL_SCREEN', Payment_Amount: FULL }),
+  ]);
 
   const glendale = byTeam(data, 'Glendale');
   assert.equal(glendale.full_count, 1);
@@ -62,31 +64,30 @@ test('summarizes full/half counts per team and owes GPSA half of each approved a
   assert.equal(data.totals.half_count, 2);
 });
 
-test('GPSA-affiliation ads owe nothing — they are collected directly, and sort last', async () => {
-  const { app, noco } = makeTestApp();
-  await ad(noco, { Team: 'GPSA', Payment_Method: 'CHECK', Payment_Amount: FULL });
-  await ad(noco, { Team: 'Wythe', Payment_Amount: FULL });
-
-  const data = await report(app);
+test('GPSA-affiliation ads owe nothing — they are collected directly, and sort last', () => {
+  const data = report([
+    row({ Team: 'GPSA', Payment_Method: 'CHECK', Payment_Amount: FULL }),
+    row({ Team: 'Wythe', Payment_Amount: FULL }),
+  ]);
 
   const gpsa = byTeam(data, 'GPSA');
   assert.equal(gpsa.is_gpsa, true);
   assert.equal(gpsa.gpsa_due_cents, 0); // nobody owes GPSA its own ad
   assert.equal(gpsa.team_keeps_cents, 0);
   assert.equal(gpsa.gross_cents, FULL);
-  assert.equal(data.teams.at(-1).team, 'GPSA'); // league group is the footnote
+  assert.equal(data.teams.at(-1).team, 'GPSA'); // league group is the last page
 
   assert.equal(data.totals.gpsa_direct_cents, FULL);
   assert.equal(data.totals.gpsa_due_cents, FULL / 2); // only Wythe owes
   assert.equal(data.totals.team_count, 1); // GPSA is not a team
 });
 
-test('under-review ads are carried separately, never billed', async () => {
-  const { app, noco } = makeTestApp();
-  await ad(noco, { Team: 'Colony', Status: 'NEEDS_REVIEW', Payment_Amount: HALF });
-  await ad(noco, { Team: 'Colony', Payment_Amount: FULL });
+test('under-review ads are carried separately, never billed', () => {
+  const colony = byTeam(report([
+    row({ Team: 'Colony', Status: 'NEEDS_REVIEW', Payment_Amount: HALF }),
+    row({ Team: 'Colony', Payment_Amount: FULL }),
+  ]), 'Colony');
 
-  const colony = byTeam(await report(app), 'Colony');
   assert.equal(colony.ad_count, 1); // the approved one
   assert.equal(colony.gross_cents, FULL);
   assert.equal(colony.gpsa_due_cents, FULL / 2);
@@ -99,53 +100,93 @@ test('under-review ads are carried separately, never billed', async () => {
   assert.equal(line.gpsa_due_cents, 0);
 });
 
-test('rejected and in-flight ads are left out of the report entirely', async () => {
-  const { app, noco } = makeTestApp();
-  await ad(noco, { Team: 'Marlbank', Status: 'REJECTED' });
-  await ad(noco, { Team: 'Marlbank', Status: 'AWAITING_UPLOAD' });
-  await ad(noco, { Team: 'Marlbank', Status: 'VALIDATING' });
-
-  const data = await report(app);
+test('rejected and in-flight ads are left out of the report entirely', () => {
+  const data = report([
+    row({ Team: 'Marlbank', Status: 'REJECTED' }),
+    row({ Team: 'Marlbank', Status: 'AWAITING_UPLOAD' }),
+    row({ Team: 'Marlbank', Status: 'VALIDATING' }),
+  ]);
   assert.equal(data.teams.length, 0);
   assert.equal(data.totals.gpsa_due_cents, 0);
 });
 
-test('unpaid tally chases PENDING only — PAID and WAIVED are settled', async () => {
-  const { app, noco } = makeTestApp();
-  await ad(noco, { Team: 'Riverdale', Payment_Status: 'PENDING', Payment_Amount: FULL });
-  await ad(noco, { Team: 'Riverdale', Payment_Status: 'PAID', Payment_Amount: HALF });
-  await ad(noco, { Team: 'Riverdale', Payment_Status: 'WAIVED', Payment_Amount: HALF });
+test('unpaid tally chases PENDING only — PAID and WAIVED are settled', () => {
+  const riverdale = byTeam(report([
+    row({ Team: 'Riverdale', Payment_Status: 'PENDING', Payment_Amount: FULL }),
+    row({ Team: 'Riverdale', Payment_Status: 'PAID', Payment_Amount: HALF }),
+    row({ Team: 'Riverdale', Payment_Status: 'WAIVED', Payment_Amount: HALF }),
+  ]), 'Riverdale');
 
-  const riverdale = byTeam(await report(app), 'Riverdale');
   assert.equal(riverdale.unpaid_count, 1);
   assert.equal(riverdale.unpaid_cents, FULL);
   // Payment status never changes what the team owes GPSA — it's a gross obligation.
   assert.equal(riverdale.gpsa_due_cents, (FULL + HALF + HALF) / 2);
 });
 
-test("a team's page lists its ads newest-first with per-ad amount and share", async () => {
-  const { app, noco } = makeTestApp();
-  await ad(noco, { Team: 'Wendwood', CreatedAt: '2026-07-01T12:00:00Z', Ad_Title: 'Older' });
-  await ad(noco, { Team: 'Wendwood', CreatedAt: '2026-07-20T12:00:00Z', Ad_Title: 'Newer' });
-  await ad(noco, { Team: 'Kiln Creek', Ad_Title: 'Other team' });
+test("a team's page lists its ads newest-first with per-ad amount and share", () => {
+  const wendwood = byTeam(report([
+    row({ Team: 'Wendwood', CreatedAt: '2026-07-01T12:00:00Z', Ad_Title: 'Older' }),
+    row({ Team: 'Wendwood', CreatedAt: '2026-07-20T12:00:00Z', Ad_Title: 'Newer' }),
+    row({ Team: 'Kiln Creek', Ad_Title: 'Other team' }),
+  ]), 'Wendwood');
 
-  const wendwood = byTeam(await report(app), 'Wendwood');
   assert.deepEqual(wendwood.ads.map((a) => a.ad_title), ['Newer', 'Older']);
   assert.equal(wendwood.ads[0].amount_cents, FULL);
   assert.equal(wendwood.ads[0].gpsa_due_cents, FULL / 2);
   assert.equal(wendwood.ads[0].payment_status, 'PENDING');
   assert.equal(
     wendwood.ads.reduce((s, a) => s + a.gpsa_due_cents, 0),
-    wendwood.gpsa_due_cents, // the page footer matches the summary row
+    wendwood.gpsa_due_cents, // the page total matches the summary row
   );
 });
 
-test('report is empty (not an error) when nothing has been submitted', async () => {
-  const { app } = makeTestApp();
-  const data = await report(app);
+test('report is empty (not an error) when nothing has been submitted', () => {
+  const data = report([]);
   assert.deepEqual(data.teams, []);
   assert.equal(data.totals.ad_count, 0);
   assert.equal(data.totals.gpsa_due_cents, 0);
   assert.ok(data.generated_at);
   assert.equal(data.meet, '2026 City Meet');
+});
+
+test('PDF renders a summary page plus one page per team', async () => {
+  const pdf = await renderTreasurerPdf(report([
+    row({ Team: 'Glendale' }),
+    row({ Team: 'Glendale', Placement: 'HALF_SCREEN', Payment_Amount: HALF }),
+    row({ Team: 'Poquoson' }),
+    row({ Team: 'GPSA', Payment_Method: 'CHECK' }),
+  ]));
+
+  assert.equal(pdf.subarray(0, 5).toString(), '%PDF-');
+  assert.equal(pageCount(pdf), 4); // summary + Glendale + Poquoson + GPSA
+});
+
+test('PDF renders with no ads at all', async () => {
+  const pdf = await renderTreasurerPdf(report([]));
+  assert.equal(pageCount(pdf), 1); // just the summary, saying there is nothing yet
+});
+
+test('a team with many ads spills onto a continuation page', async () => {
+  const many = Array.from({ length: 40 }, () => row({ Team: 'Hidenwood' }));
+  const pdf = await renderTreasurerPdf(report(many));
+  assert.ok(pageCount(pdf) > 2, 'summary + at least two pages for the long team');
+});
+
+test('GET /admin-api/treasurer.pdf downloads the report', async () => {
+  const { app, noco } = makeTestApp();
+  await noco.createAd(row({ Team: 'Glendale' }));
+  await noco.createAd(row({ Team: 'GPSA', Payment_Method: 'CHECK' }));
+
+  const res = await app.inject({ method: 'GET', url: '/admin-api/treasurer.pdf' });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers['content-type'], 'application/pdf');
+  assert.equal(res.headers['cache-control'], 'private, no-store');
+  assert.match(res.headers['content-disposition'], /^attachment; filename="gpsa-treasurer-report-\d{4}-\d{2}-\d{2}\.pdf"$/);
+  assert.equal(res.rawPayload.subarray(0, 5).toString(), '%PDF-');
+  assert.equal(pageCount(res.rawPayload), 3); // summary + Glendale + GPSA
+});
+
+test('the download filename carries the generation date', () => {
+  const data = buildTreasurerReport([], { generatedAt: new Date('2026-07-29T15:04:05Z') });
+  assert.equal(treasurerPdfFilename(data), 'gpsa-treasurer-report-2026-07-29.pdf');
 });

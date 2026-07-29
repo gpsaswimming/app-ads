@@ -35,19 +35,20 @@ never edge-routed). Layer a shared token on later if the trust model tightens.
       - `PAY_TEAM` ads → the advertiser pays the **team**; the team remits **GPSA's 50%**.
         Report shows, per team: total ad revenue and the 50% owed to GPSA.
       - `GPSA` ads (`CHECK` / `SQUARE_INVOICE`) → paid to GPSA directly (not a team debt).
-      - ✅ **Done:** `GET /admin-api/treasurer` aggregates the `Ads` rows server-side — per
-        affiliation: full/half counts, gross ad revenue, the 50% due to GPSA, the half the
-        team keeps, an unpaid tally, and under-review ads carried separately (not billed
-        until approved). Rejected/in-flight ads are excluded. The split rule lives in
-        `src/billing.js`, shared with the team status list so the two can't drift. The
-        dashboard renders it as a **summary table** (a row per team, the amount due
-        highlighted, grand total in the footer) at `#/treasurer` and a **per-team page**
-        (`#/treasurer/<team>`) listing that team's ads with each amount and the total due —
-        both printable. Amounts due are **gross**: `Payment_Status` never changes what a
-        team owes GPSA.
+      - ✅ **Done — as a PDF, not another screen.** `GET /admin-api/treasurer.pdf` returns a
+        print-ready document the treasurer files or mails: **page 1** is the league summary
+        (a row per team — full/half counts, ad revenue, and the amount due, with the total
+        due highlighted and a grand-total row), then **one page per team** listing that
+        team's ads with each amount, its GPSA share, and the total due (long teams spill to
+        a continuation page). The dashboard's only addition is a download button.
+        `src/reports/treasurer.js` does the aggregation, `treasurer-pdf.js` the layout
+        (pdfkit, built-in Helvetica — no bundled fonts or images). Rejected/in-flight ads
+        are excluded; under-review ads are listed but not billed until approved. The split
+        rule lives in `src/billing.js`, shared with the team status list so the two can't
+        drift. Amounts due are **gross**: `Payment_Status` never changes what a team owes.
       - [ ] Filterable by `Payment_Status` (PENDING / PAID / WAIVED) so the treasurer can
-        chase outstanding balances. *(Today the report shows an unpaid count/total per team
-        and each ad's payment status; there is no filter control yet.)*
+        chase outstanding balances. *(Today the PDF shows an unpaid count/total per team and
+        each ad's payment status, but the report is not filtered.)*
       - [ ] ⚠️ **Set-payment-status** admin endpoint (`PENDING`/`PAID`/`WAIVED`) — still not
         built. Until it lands, payment status is set by hand in NocoDB and the report reads
         it; the filter above is worth little without it.

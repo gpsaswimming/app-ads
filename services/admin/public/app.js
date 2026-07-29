@@ -43,8 +43,6 @@
   };
   const contactName = (ad) => (ad.submitter_is_advertiser ? ad.submitter_name : ad.advertiser_name) || ad.submitter_name;
 
-  const placement = (p) => (p === 'FULL_SCREEN' ? 'Full' : p === 'HALF_SCREEN' ? 'Half' : (p || '—'));
-
   // ---- state ----
   const FILTERS = [
     { key: 'all', label: 'All', match: () => true },
@@ -54,8 +52,6 @@
     { key: 'open', label: 'Awaiting upload', match: (s) => ['AWAITING_UPLOAD', 'UPLOADED', 'VALIDATING'].includes(s) },
   ];
   let ads = [];
-  let adsLoaded = false;
-  let report = null; // treasurer payload, fetched lazily
   let active = 'all';
   let current = null; // ad shown in the drawer
 
@@ -72,23 +68,9 @@
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       ads = (data.ads || []).slice().sort(byNewest);
-      adsLoaded = true;
       render();
     } catch (err) {
       showToast(`Couldn't load submissions: ${err.message}`, 'error', 8000);
-    }
-  }
-
-  /** Fetch the treasurer report. The API owns the split rule — nothing here recomputes money. */
-  async function loadReport() {
-    try {
-      const res = await fetch('/admin-api/treasurer', { headers: { accept: 'application/json' } });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      report = await res.json();
-      return true;
-    } catch (err) {
-      showToast(`Couldn't load the treasurer report: ${err.message}`, 'error', 8000);
-      return false;
     }
   }
 
@@ -105,9 +87,6 @@
       throw new Error(detail.error || `HTTP ${res.status}`);
     }
     const data = await res.json();
-    // An approve/deny changes what a team owes — drop the cached report so the treasurer
-    // screens refetch instead of showing pre-decision money.
-    report = null;
     // Splice the updated ad back into local state.
     const i = ads.findIndex((a) => a.ad_id === ad.ad_id);
     if (i >= 0 && data.ad) ads[i] = data.ad;
@@ -270,222 +249,6 @@
     current = null;
   }
 
-  // ---- treasurer report ----
-  // Two screens off one payload: the per-team summary and a team's own page. Team names
-  // come from the API's enum, but they still go in via textContent like everything else.
-
-  function kpi(label, value, opts = {}) {
-    const box = document.createElement('div');
-    box.className = `kpi${opts.highlight ? ' due' : ''}`;
-    const k = document.createElement('div'); k.className = 'k'; k.textContent = label;
-    const v = document.createElement('div'); v.className = 'v'; v.textContent = value;
-    box.append(k, v);
-    if (opts.note) {
-      const n = document.createElement('div'); n.className = 'note'; n.textContent = opts.note;
-      box.appendChild(n);
-    }
-    return box;
-  }
-
-  function numCell(text, cls) {
-    const td = document.createElement('td');
-    td.className = cls ? `num ${cls}` : 'num';
-    td.textContent = text;
-    return td;
-  }
-
-  function renderTreasurer() {
-    if (!report) return;
-    const t = report.totals;
-
-    $('t-sub').textContent = [
-      report.meet,
-      `${t.team_count} team${t.team_count === 1 ? '' : 's'}`,
-      `as of ${when(report.generated_at) || 'today'}`,
-    ].filter(Boolean).join(' · ');
-
-    const kpis = $('t-kpis');
-    kpis.textContent = '';
-    kpis.append(
-      kpi('Total due to GPSA', money(t.gpsa_due_cents), { highlight: true, note: '50% of approved team ads' }),
-      kpi('Ad revenue', money(t.gross_cents), { note: `${t.ad_count} approved · ${t.full_count} full / ${t.half_count} half` }),
-      kpi('Billed by GPSA directly', money(t.gpsa_direct_cents), { note: 'GPSA-affiliation ads' }),
-      kpi('Advertisers unpaid', money(t.unpaid_cents), { note: `${t.unpaid_count} ad${t.unpaid_count === 1 ? '' : 's'} outstanding` }),
-    );
-    if (t.pending_count) {
-      kpis.appendChild(kpi('Under review', money(t.pending_cents), {
-        note: `${t.pending_count} ad${t.pending_count === 1 ? '' : 's'} not yet counted`,
-      }));
-    }
-
-    const tbody = $('t-rows');
-    tbody.textContent = '';
-    for (const g of report.teams) {
-      const tr = document.createElement('tr');
-      tr.className = 'team-row';
-      tr.addEventListener('click', () => { location.hash = `#/treasurer/${encodeURIComponent(g.team)}`; });
-
-      const name = document.createElement('td');
-      name.className = 'team-name';
-      name.textContent = g.team;
-      if (g.unpaid_count) {
-        const chase = document.createElement('span');
-        chase.className = 'chase';
-        chase.textContent = `${g.unpaid_count} unpaid · ${money(g.unpaid_cents)}`;
-        name.appendChild(chase);
-      }
-
-      const due = g.is_gpsa
-        ? numCell('—')
-        : numCell(money(g.gpsa_due_cents), 'due-cell');
-      if (g.is_gpsa) due.title = 'Collected by GPSA directly — not a team debt';
-
-      const more = document.createElement('td');
-      more.className = 'muted';
-      more.textContent = g.pending_count ? `${g.pending_count} under review →` : '→';
-
-      tr.append(
-        name,
-        numCell(String(g.full_count)),
-        numCell(String(g.half_count)),
-        numCell(String(g.ad_count)),
-        numCell(money(g.gross_cents)),
-        due,
-        more,
-      );
-      tbody.appendChild(tr);
-    }
-
-    const foot = $('t-foot');
-    foot.textContent = '';
-    if (report.teams.length) {
-      const tr = document.createElement('tr');
-      const label = document.createElement('td'); label.textContent = 'All teams';
-      tr.append(
-        label,
-        numCell(String(t.full_count)),
-        numCell(String(t.half_count)),
-        numCell(String(t.ad_count)),
-        numCell(money(t.gross_cents)),
-        numCell(money(t.gpsa_due_cents), 'due-cell'),
-        document.createElement('td'),
-      );
-      foot.appendChild(tr);
-    }
-    $('t-empty').hidden = report.teams.length > 0;
-  }
-
-  function renderTeamPage(team) {
-    if (!report) return;
-    const g = report.teams.find((x) => x.team === team);
-    if (!g) {
-      showToast(`No report rows for ${team}.`, 'info');
-      location.hash = '#/treasurer';
-      return;
-    }
-
-    $('tm-title').textContent = g.team;
-    $('tm-sub').textContent = [
-      report.meet,
-      `${g.ad_count} approved ad${g.ad_count === 1 ? '' : 's'} · ${g.full_count} full / ${g.half_count} half`,
-      g.pending_count ? `${g.pending_count} under review` : '',
-    ].filter(Boolean).join(' · ');
-
-    const kpis = $('tm-kpis');
-    kpis.textContent = '';
-    if (g.is_gpsa) {
-      kpis.append(
-        kpi('Billed by GPSA', money(g.gross_cents), { highlight: true, note: 'Paid to GPSA directly' }),
-        kpi('Unpaid', money(g.unpaid_cents), { note: `${g.unpaid_count} ad${g.unpaid_count === 1 ? '' : 's'} outstanding` }),
-      );
-    } else {
-      kpis.append(
-        kpi('Due to GPSA', money(g.gpsa_due_cents), { highlight: true, note: '50% of approved ads' }),
-        kpi('Ad revenue', money(g.gross_cents), { note: 'Collected by the team' }),
-        kpi('Team keeps', money(g.team_keeps_cents), { note: 'The other 50%' }),
-        kpi('Advertisers unpaid', money(g.unpaid_cents), { note: `${g.unpaid_count} ad${g.unpaid_count === 1 ? '' : 's'} outstanding` }),
-      );
-    }
-
-    const tbody = $('tm-rows');
-    tbody.textContent = '';
-    for (const a of g.ads) {
-      const tr = document.createElement('tr');
-      const pendingRow = a.status !== 'APPROVED';
-
-      const who = document.createElement('td');
-      who.className = 'company';
-      const co = document.createElement('div'); co.className = 'co'; co.textContent = a.company_name || '—';
-      const sub = document.createElement('div'); sub.className = 'sub'; sub.textContent = a.ad_title || '';
-      who.append(co, sub);
-
-      const place = document.createElement('td'); place.textContent = placement(a.placement);
-      const date = document.createElement('td'); date.className = 'muted'; date.textContent = when(a.submitted_at) || '—';
-      const st = document.createElement('td'); st.appendChild(statusBadge(a.status));
-
-      const pay = document.createElement('td');
-      pay.className = `pay-${a.payment_status}`;
-      pay.textContent = `${(a.payment_method || '').replace(/_/g, ' ').toLowerCase()} · ${(a.payment_status || '').toLowerCase()}`.trim();
-
-      // An under-review ad shows its rate but contributes nothing until it is approved.
-      const amount = numCell(money(a.amount_cents), pendingRow ? 'muted' : '');
-      const share = g.is_gpsa || pendingRow ? numCell('—', 'muted') : numCell(money(a.gpsa_due_cents), 'due-cell');
-
-      tr.append(who, place, date, st, pay, amount, share);
-      tbody.appendChild(tr);
-    }
-
-    const foot = $('tm-foot');
-    foot.textContent = '';
-    if (g.ads.length) {
-      const tr = document.createElement('tr');
-      const label = document.createElement('td');
-      label.colSpan = 5;
-      label.textContent = g.is_gpsa ? 'Approved total (paid to GPSA directly)' : 'Approved total · due to GPSA';
-      tr.append(
-        label,
-        numCell(money(g.gross_cents)),
-        g.is_gpsa ? numCell('—') : numCell(money(g.gpsa_due_cents), 'due-cell'),
-      );
-      foot.appendChild(tr);
-    }
-    $('tm-empty').hidden = g.ads.length > 0;
-  }
-
-  // ---- routing ----
-  // #/ → submissions · #/treasurer → summary · #/treasurer/<team> → that team's page.
-  const PAGES = ['page-ads', 'page-treasurer', 'page-team'];
-
-  function showPage(id) {
-    PAGES.forEach((p) => $(p).classList.toggle('hidden', p !== id));
-    $('tab-ads').classList.toggle('on', id === 'page-ads');
-    $('tab-treasurer').classList.toggle('on', id !== 'page-ads');
-    window.scrollTo(0, 0);
-  }
-
-  async function route() {
-    const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
-
-    if (parts[0] !== 'treasurer') {
-      showPage('page-ads');
-      if (!adsLoaded) await load();
-      return;
-    }
-
-    if (!report && !(await loadReport())) return;
-    if (parts[1]) {
-      showPage('page-team');
-      renderTeamPage(decodeURIComponent(parts[1]));
-    } else {
-      showPage('page-treasurer');
-      renderTreasurer();
-    }
-  }
-
-  async function refreshReport() {
-    if (await loadReport()) route();
-  }
-
   // ---- wire up ----
   $('refresh').addEventListener('click', load);
   $('d-close').addEventListener('click', closeDrawer);
@@ -494,11 +257,5 @@
   $('d-approve').addEventListener('click', () => current && approve(current));
   $('d-deny').addEventListener('click', () => current && deny(current));
 
-  $('t-refresh').addEventListener('click', refreshReport);
-  $('t-print').addEventListener('click', () => window.print());
-  $('tm-print').addEventListener('click', () => window.print());
-  $('tm-back').addEventListener('click', () => { location.hash = '#/treasurer'; });
-  window.addEventListener('hashchange', route);
-
-  route();
+  load();
 })();
