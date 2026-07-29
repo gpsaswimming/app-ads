@@ -210,7 +210,8 @@ boundary. Keeping internet egress out of the data tier is worth the extra hop.
    - else call **Gemini** for an appropriateness check;
      - appropriate → rename `pending_`→`approved_`, `Status = APPROVED`, confirmation email;
      - flagged/uncertain/error → `Status = NEEDS_REVIEW` for a human;
-6. **Admin.** Admin opens NocoDB (VPN), reviews `NEEDS_REVIEW`, sets `Payment_Status`.
+6. **Admin.** Admin reviews `NEEDS_REVIEW` in the dashboard (VPN) and marks league invoices
+   paid; NocoDB stays available for anything the dashboard doesn't cover.
 7. **Meet prep.** Before the meet, the **meet director** downloads the approved artwork **on the
    LAN** (console/`mc`, or the optional bulk-export helper in §7) and curates/touches it up for
    the scoreboard. The platform's responsibility ends at "approved files, easy to grab."
@@ -295,7 +296,7 @@ boundary. Keeping internet egress out of the data tier is worth the extra hop.
 | `Rights_Confirmed_At` | DateTime | Set by the API when a submission with the box checked is accepted. Immutable. |
 | `Payment_Method` | Enum | `PAY_TEAM` (advertiser pays the affiliated team directly; team remits GPSA's 50%) \| `CHECK` (pay GPSA by check) \| `SQUARE_INVOICE` (GPSA sends a Square invoice). Constrained by `Team` — see below. |
 | `Payment_Amount` | Integer (cents) | Set by the API from `Placement` at submission (config map, editable per season). |
-| `Payment_Status` | Enum | `PENDING` \| `PAID` \| `WAIVED`. Set manually by admin. |
+| `Payment_Status` | Enum | `PENDING` \| `PAID` \| `WAIVED`. **League ads only** — GPSA invoices `Team = GPSA` ads itself (check / Square) and records the outcome from the admin dashboard. A `PAY_TEAM` ad is collected by the team from its advertiser; GPSA never sees that transaction and does not track it (the team's 50% is owed either way). |
 | `Created_At` | DateTime | Auto. |
 | `Updated_At` | DateTime | Auto. |
 

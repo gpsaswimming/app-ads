@@ -42,6 +42,10 @@
     return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   };
   const contactName = (ad) => (ad.submitter_is_advertiser ? ad.submitter_name : ad.advertiser_name) || ad.submitter_name;
+  // Payment is tracked for LEAGUE ads only — those are invoiced by GPSA (check / Square).
+  // A team-affiliation ad is collected by the team from its advertiser; GPSA never sees
+  // that transaction, so there is no status to keep and none is shown.
+  const isLeagueAd = (ad) => ad.team === 'GPSA';
 
   // ---- state ----
   const FILTERS = [
@@ -103,6 +107,20 @@
     } catch (err) {
       const msg = err.message === 'NO_ARTWORK' ? 'No artwork uploaded yet — nothing to approve.'
         : `Approve failed: ${err.message}`;
+      showToast(msg, 'error', 8000);
+    }
+  }
+
+  async function setPayment(ad, paymentStatus) {
+    try {
+      await act(ad, 'payment', { payment_status: paymentStatus });
+      showToast(`Invoice marked ${paymentStatus.toLowerCase()}.`, 'success');
+      if (current && current.ad_id === ad.ad_id) openDrawer(ads.find((a) => a.ad_id === ad.ad_id));
+      render();
+    } catch (err) {
+      const msg = err.message === 'PAY_TEAM_NOT_TRACKED'
+        ? 'This ad is collected by the team — GPSA does not track its payment.'
+        : `Couldn't update payment: ${err.message}`;
       showToast(msg, 'error', 8000);
     }
   }
@@ -172,8 +190,13 @@
       const amt = document.createElement('td'); amt.textContent = money(ad.payment_amount);
 
       const pay = document.createElement('td');
-      pay.className = `pay-${ad.payment_status}`;
-      pay.textContent = (ad.payment_status || '').toLowerCase() || '—';
+      if (isLeagueAd(ad)) {
+        pay.className = `pay-${ad.payment_status}`;
+        pay.textContent = (ad.payment_status || '').toLowerCase() || '—';
+      } else {
+        pay.className = 'muted';
+        pay.textContent = 'team collects';
+      }
 
       const st = document.createElement('td'); st.appendChild(statusBadge(ad.status));
 
@@ -202,6 +225,26 @@
     dl.append(dt, dd);
   }
 
+  /** Invoice status as a set of pills — the current one is on, the others set it. */
+  function paymentRow(dl, ad) {
+    const dt = document.createElement('dt'); dt.textContent = 'Invoice';
+    const dd = document.createElement('dd');
+    const group = document.createElement('div');
+    group.className = 'pay-picker';
+    for (const [value, label] of [['PENDING', 'Pending'], ['PAID', 'Paid'], ['WAIVED', 'Waived']]) {
+      const b = document.createElement('button');
+      const on = (ad.payment_status || 'PENDING') === value;
+      b.type = 'button';
+      b.className = `pill p-${value}${on ? ' on' : ''}`;
+      b.textContent = label;
+      b.disabled = on;
+      b.addEventListener('click', () => setPayment(ad, value));
+      group.appendChild(b);
+    }
+    dd.appendChild(group);
+    dl.append(dt, dd);
+  }
+
   function openDrawer(ad) {
     current = ad;
     $('d-title').textContent = ad.ad_title || ad.company_name || 'Ad';
@@ -226,7 +269,13 @@
     detailRow(dl, 'Team', ad.team);
     detailRow(dl, 'Placement', ad.placement === 'FULL_SCREEN' ? 'Full-screen (9:4)' : ad.placement === 'HALF_SCREEN' ? 'Half-screen (9:8)' : ad.placement);
     detailRow(dl, 'Amount', money(ad.payment_amount));
-    detailRow(dl, 'Payment', `${(ad.payment_method || '').replace(/_/g, ' ')} · ${(ad.payment_status || '').toLowerCase()}`);
+    if (isLeagueAd(ad)) {
+      // GPSA invoiced this one, so GPSA records whether it has been settled — click to set.
+      detailRow(dl, 'Billed by', (ad.payment_method || '').replace(/_/g, ' ').toLowerCase());
+      paymentRow(dl, ad);
+    } else {
+      detailRow(dl, 'Payment', `the ${ad.team} team collects from its advertiser`);
+    }
     detailRow(dl, 'Submitter', `${contactName(ad)} · ${ad.submitter_email}${ad.submitter_phone ? ' · ' + ad.submitter_phone : ''}`);
     if (!ad.submitter_is_advertiser && ad.advertiser_email) {
       detailRow(dl, 'Advertiser', `${ad.advertiser_name} · ${ad.advertiser_email}`);

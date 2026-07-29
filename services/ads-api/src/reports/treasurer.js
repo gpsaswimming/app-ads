@@ -23,7 +23,8 @@ function toLine(row) {
     ad_title: row.Ad_Title || '',
     placement: row.Placement || null,
     payment_method: row.Payment_Method || null,
-    payment_status: row.Payment_Status || null,
+    // Tracked for league invoices only — null on a team ad, which the team collects itself.
+    payment_status: isTeamAffiliated(row) ? null : (row.Payment_Status || null),
     // What the advertiser owes for the ad …
     amount_cents: amountCents(row),
     // … and the slice of it the team remits to GPSA (0 until the ad is approved).
@@ -45,8 +46,10 @@ function newGroup(team) {
     gpsa_due_cents: 0,
     // The half the team keeps. Always 0 for the GPSA group.
     team_keeps_cents: 0,
-    // Approved ads the advertiser has not settled yet (Payment_Status other than
-    // PAID/WAIVED) — the treasurer's chase list. Does not reduce gpsa_due_cents.
+    // LEAGUE ADS ONLY: approved GPSA-affiliation invoices not settled yet (Payment_Status
+    // other than PAID/WAIVED) — the treasurer's chase list. Team ads stay 0: the team
+    // collects from its advertiser and GPSA never sees that transaction, so there is
+    // nothing to chase and nothing that would change the team's 50% remittance.
     unpaid_count: 0,
     unpaid_cents: 0,
     // Still under review: not counted anywhere above, listed so the report reads honestly
@@ -72,8 +75,9 @@ function addToGroup(group, row) {
   else if (row.Placement === 'HALF_SCREEN') group.half_count += 1;
   group.gross_cents += line.amount_cents || 0;
   group.gpsa_due_cents += line.gpsa_due_cents;
-  if (isTeamAffiliated(row)) group.team_keeps_cents += (line.amount_cents || 0) - line.gpsa_due_cents;
-  if (row.Payment_Status !== 'PAID' && row.Payment_Status !== 'WAIVED') {
+  if (isTeamAffiliated(row)) {
+    group.team_keeps_cents += (line.amount_cents || 0) - line.gpsa_due_cents;
+  } else if (row.Payment_Status !== 'PAID' && row.Payment_Status !== 'WAIVED') {
     group.unpaid_count += 1;
     group.unpaid_cents += line.amount_cents || 0;
   }
