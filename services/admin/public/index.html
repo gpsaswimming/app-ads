@@ -25,8 +25,14 @@
                   align-items: center; gap: 14px; }
         .topbar img { height: 34px; width: auto; }
         .topbar .title { font-weight: 700; font-size: 1.05rem; letter-spacing: .2px; }
-        .topbar .env { margin-left: auto; font-size: .72rem; text-transform: uppercase;
+        .topbar .env { font-size: .72rem; text-transform: uppercase;
                        letter-spacing: .12em; color: #9fb3e0; }
+        .tabs { display: flex; gap: 4px; margin-left: 18px; }
+        .tabs a { color: #cdd8f0; text-decoration: none; font-size: .85rem; font-weight: 600;
+                  padding: 6px 13px; border-radius: 999px; }
+        .tabs a:hover { background: rgba(255,255,255,.09); color: #fff; }
+        .tabs a.on { background: #fff; color: var(--navy); }
+        .topbar .spacer { margin-left: auto; }
         .wrap { max-width: 80rem; margin: 0 auto; padding: 22px; }
 
         .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
@@ -73,6 +79,43 @@
         .pay-WAIVED { color: var(--mut); }
 
         .empty { padding: 48px 20px; text-align: center; color: var(--mut); }
+        .hidden { display: none !important; }
+
+        /* ---- Treasurer report ---- */
+        .page-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+        .page-head h1 { font-size: 1.25rem; margin: 0; }
+        .page-head .sub { color: var(--mut); font-size: .85rem; }
+        .back { background: none; border: 0; padding: 0; font: inherit; font-weight: 600;
+                color: var(--navy-hi); cursor: pointer; }
+        .back:hover { text-decoration: underline; }
+
+        /* The headline number: what the teams owe GPSA. */
+        .kpis { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+        .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+               padding: 14px 18px; min-width: 10.5rem; }
+        .kpi .k { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--mut); }
+        .kpi .v { font-size: 1.5rem; font-weight: 800; margin-top: 4px; font-variant-numeric: tabular-nums; }
+        .kpi.due { background: var(--navy); border-color: var(--navy); color: #fff; }
+        .kpi.due .k { color: #9fb3e0; }
+        .kpi .note { font-size: .74rem; color: var(--mut); margin-top: 3px; }
+
+        th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+        td.due-cell { font-weight: 700; color: var(--navy); background: #f2f6ff; }
+        tfoot td { background: #eef2fb; font-weight: 700; border-top: 2px solid var(--line);
+                   border-bottom: 0; }
+        tfoot td.due-cell { color: var(--navy); background: #e2eaff; font-size: 1rem; }
+        tbody tr.team-row:hover { background: #f7f9ff; }
+        td.team-name { font-weight: 600; }
+        td.team-name .chase { display: block; font-weight: 500; font-size: .76rem; color: #8a5a00; }
+        .foot-note { padding: 12px 16px; color: var(--mut); font-size: .8rem; background: #fafbfe; }
+
+        @media print {
+            .topbar, .toolbar, .back, .btn { display: none !important; }
+            body { background: #fff; }
+            .card, .kpi { border-color: #bbb; }
+            .kpi.due { background: #fff; color: var(--ink); border: 2px solid var(--navy); }
+            .kpi.due .k { color: var(--mut); }
+        }
 
         /* Detail drawer */
         .scrim { position: fixed; inset: 0; background: rgba(10,18,40,.55); display: none;
@@ -104,10 +147,16 @@
         <img src="https://assets.gpsaswimming.org/img/gpsa_logo.png" alt="GPSA"
              onerror="this.onerror=null;this.src='https://placehold.co/80x80/002366/FFFFFF?text=GPSA';">
         <span class="title">Scoreboard Ads · Admin</span>
+        <nav class="tabs">
+            <a href="#/" id="tab-ads">Submissions</a>
+            <a href="#/treasurer" id="tab-treasurer">Treasurer</a>
+        </nav>
+        <span class="spacer"></span>
         <span class="env">Internal — VPN only</span>
     </div>
 
-    <main class="wrap">
+    <!-- Submissions (review / approve / deny) -->
+    <main class="wrap" id="page-ads">
         <div class="toolbar">
             <div class="filters" id="filters"></div>
             <div class="spacer"></div>
@@ -132,6 +181,87 @@
                 </table>
             </div>
             <div class="empty" id="empty" hidden>No submissions match this filter.</div>
+        </div>
+    </main>
+
+    <!-- Treasurer: what each team owes GPSA -->
+    <main class="wrap hidden" id="page-treasurer">
+        <div class="page-head">
+            <h1>Treasurer report</h1>
+            <span class="sub" id="t-sub"></span>
+        </div>
+
+        <div class="kpis" id="t-kpis"></div>
+
+        <div class="toolbar">
+            <div class="spacer"></div>
+            <button class="btn btn-ghost" id="t-print">⎙ Print</button>
+            <button class="btn btn-ghost" id="t-refresh">↻ Refresh</button>
+        </div>
+
+        <div class="card">
+            <div class="tablewrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Team</th>
+                            <th class="num">Full</th>
+                            <th class="num">Half</th>
+                            <th class="num">Ads</th>
+                            <th class="num">Ad revenue</th>
+                            <th class="num">Due to GPSA</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="t-rows"></tbody>
+                    <tfoot id="t-foot"></tfoot>
+                </table>
+            </div>
+            <div class="empty" id="t-empty" hidden>No approved or under-review ads yet.</div>
+            <div class="foot-note">
+                Teams collect from their advertisers and remit <strong>50%</strong> to GPSA;
+                GPSA-affiliation ads are billed by GPSA directly. Amounts due are gross —
+                they don't change when an advertiser pays.
+            </div>
+        </div>
+    </main>
+
+    <!-- Treasurer: one team's ads -->
+    <main class="wrap hidden" id="page-team">
+        <div class="page-head">
+            <button class="back" id="tm-back">← All teams</button>
+        </div>
+        <div class="page-head">
+            <h1 id="tm-title">Team</h1>
+            <span class="sub" id="tm-sub"></span>
+        </div>
+
+        <div class="kpis" id="tm-kpis"></div>
+
+        <div class="toolbar">
+            <div class="spacer"></div>
+            <button class="btn btn-ghost" id="tm-print">⎙ Print</button>
+        </div>
+
+        <div class="card">
+            <div class="tablewrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Advertiser / Ad</th>
+                            <th>Placement</th>
+                            <th>Submitted</th>
+                            <th>Status</th>
+                            <th>Payment</th>
+                            <th class="num">Amount</th>
+                            <th class="num">GPSA share</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tm-rows"></tbody>
+                    <tfoot id="tm-foot"></tfoot>
+                </table>
+            </div>
+            <div class="empty" id="tm-empty" hidden>No ads for this team.</div>
         </div>
     </main>
 
