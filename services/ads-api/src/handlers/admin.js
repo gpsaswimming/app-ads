@@ -6,7 +6,8 @@
 // the sole credential holder (DESIGN.md §3 inv 4) — the dashboard holds zero creds and
 // goes through here for everything (NocoDB reads, artwork bytes, the approve rename).
 
-import { STATUS } from '../constants.js';
+import { isTeamAffiliated } from '../billing.js';
+import { PAYMENT_STATUSES, STATUS } from '../constants.js';
 import { keyFromUri } from '../clients/minio.js';
 import { buildTreasurerReport } from '../reports/treasurer.js';
 import { renderTreasurerPdf, treasurerPdfFilename } from '../reports/treasurer-pdf.js';
@@ -128,6 +129,35 @@ export function makeAdminHandlers(ctx) {
   }
 
   /**
+   * POST /admin-api/ads/:adId/payment — record whether a league invoice has been settled.
+   *
+   * Only league (GPSA-affiliation) ads are tracked: those are billed by GPSA itself, by
+   * check or Square invoice, so GPSA knows when the money arrives. A team-affiliation ad is
+   * collected by the team from its advertiser — GPSA never sees that transaction and does
+   * not track it (the team still owes its 50% either way), so this rejects those rather
+   * than storing a status nothing maintains.
+   */
+  async function setPayment(request, reply) {
+    const status = String(request.body?.payment_status || '').toUpperCase();
+    if (!PAYMENT_STATUSES.includes(status)) {
+      return reply.code(400).send({ error: 'BAD_PAYMENT_STATUS', allowed: PAYMENT_STATUSES });
+    }
+
+    const row = await noco.findByAdId(request.params.adId);
+    if (!row) return reply.code(404).send({ error: 'NOT_FOUND' });
+    if (isTeamAffiliated(row)) {
+      return reply.code(409).send({ error: 'PAY_TEAM_NOT_TRACKED' });
+    }
+
+    const update = { Payment_Status: status };
+    await noco.updateAd(row.Id, update);
+    Object.assign(row, update);
+
+    log.info({ adId: row.Ad_ID, paymentStatus: status }, 'payment status set by admin');
+    return reply.send({ ad: toSummary(row, bucket) });
+  }
+
+  /**
    * GET /admin-api/treasurer.pdf — the treasurer report, as a PDF download.
    *
    * A print-ready document, not a screen: page 1 is the league summary (a row per team, the
@@ -148,5 +178,5 @@ export function makeAdminHandlers(ctx) {
       .send(pdf);
   }
 
-  return { list, artwork, approve, deny, treasurerPdf };
+  return { list, artwork, approve, deny, setPayment, treasurerPdf };
 }

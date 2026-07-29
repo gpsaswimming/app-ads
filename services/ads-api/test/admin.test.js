@@ -143,6 +143,63 @@ test('POST deny with no reason falls back to a default note', async () => {
   assert.equal(noco.rows.get(adId).Validation_Notes, 'Not approved for display');
 });
 
+/** Submit a league (GPSA-affiliation) ad — the only kind whose payment GPSA tracks. */
+async function submitLeagueAd(app) {
+  return submitOne(app, { team: 'GPSA', payment_method: 'CHECK' });
+}
+
+test('POST payment records a league invoice as paid', async () => {
+  const { app, noco } = makeTestApp();
+  const adId = await submitLeagueAd(app);
+
+  const res = await app.inject({
+    method: 'POST',
+    url: `/admin-api/ads/${adId}/payment`,
+    payload: { payment_status: 'PAID' },
+  });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.json().ad.payment_status, 'PAID');
+  assert.equal(noco.rows.get(adId).Payment_Status, 'PAID');
+});
+
+test('POST payment accepts PENDING and WAIVED too, and nothing else', async () => {
+  const { app, noco } = makeTestApp();
+  const adId = await submitLeagueAd(app);
+
+  for (const status of ['WAIVED', 'PENDING']) {
+    const res = await app.inject({
+      method: 'POST',
+      url: `/admin-api/ads/${adId}/payment`,
+      payload: { payment_status: status },
+    });
+    assert.equal(res.statusCode, 200, status);
+    assert.equal(noco.rows.get(adId).Payment_Status, status);
+  }
+
+  const bad = await app.inject({
+    method: 'POST',
+    url: `/admin-api/ads/${adId}/payment`,
+    payload: { payment_status: 'INVOICED' },
+  });
+  assert.equal(bad.statusCode, 400);
+  assert.equal(bad.json().error, 'BAD_PAYMENT_STATUS');
+  assert.equal(noco.rows.get(adId).Payment_Status, 'PENDING'); // unchanged
+});
+
+test('POST payment → 409 on a team ad: the team collects, GPSA does not track it', async () => {
+  const { app, noco } = makeTestApp();
+  const adId = await submitOne(app); // Glendale / PAY_TEAM
+
+  const res = await app.inject({
+    method: 'POST',
+    url: `/admin-api/ads/${adId}/payment`,
+    payload: { payment_status: 'PAID' },
+  });
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.json().error, 'PAY_TEAM_NOT_TRACKED');
+  assert.equal(noco.rows.get(adId).Payment_Status, 'PENDING'); // untouched
+});
+
 test('admin actions on an unknown Ad_ID → 404', async () => {
   const { app } = makeTestApp();
   for (const url of ['/admin-api/ads/nope/artwork', '/admin-api/ads/nope/approve', '/admin-api/ads/nope/deny']) {
@@ -150,4 +207,11 @@ test('admin actions on an unknown Ad_ID → 404', async () => {
     const res = await app.inject({ method, url, payload: method === 'POST' ? {} : undefined });
     assert.equal(res.statusCode, 404, url);
   }
+
+  const payment = await app.inject({
+    method: 'POST',
+    url: '/admin-api/ads/nope/payment',
+    payload: { payment_status: 'PAID' }, // valid body, so the 404 is about the ad
+  });
+  assert.equal(payment.statusCode, 404);
 });
