@@ -46,12 +46,20 @@ never edge-routed). Layer a shared token on later if the trust model tightens.
         are excluded; under-review ads are listed but not billed until approved. The split
         rule lives in `src/billing.js`, shared with the team status list so the two can't
         drift. Amounts due are **gross**: `Payment_Status` never changes what a team owes.
-      - [ ] Filterable by `Payment_Status` (PENDING / PAID / WAIVED) so the treasurer can
-        chase outstanding balances. *(Today the PDF shows an unpaid count/total per team and
-        each ad's payment status, but the report is not filtered.)*
-      - [ ] ⚠️ **Set-payment-status** admin endpoint (`PENDING`/`PAID`/`WAIVED`) — still not
-        built. Until it lands, payment status is set by hand in NocoDB and the report reads
-        it; the filter above is worth little without it.
+      - ✅ **Payment tracking is league-only (decided 2026-07-29).** Only `GPSA`-affiliation
+        ads are invoiced by GPSA (check / Square), so those are the only payments GPSA can
+        see and the only ones tracked. A team-affiliation ad is collected by the team from
+        its advertiser — GPSA never sees that transaction, and the team's 50% is owed either
+        way — so `Payment_Status` is not shown or set for team ads anywhere: the dashboard
+        list says "team collects", the report's team pages drop the column, and
+        `POST /admin-api/ads/:id/payment` **409s** (`PAY_TEAM_NOT_TRACKED`) on one. The
+        league page carries the invoice status instead of a 50% column, and the summary's
+        unpaid figure counts league invoices only.
+      - ✅ **Set-payment-status endpoint — done.** `POST /admin-api/ads/:id/payment`
+        (`PENDING` / `PAID` / `WAIVED`); the dashboard drawer shows it as a pill picker on a
+        league ad, so the treasurer clicks the ad and marks it paid. No filter view was
+        built — with team ads out of scope, the report's per-team unpaid figure is the whole
+        chase list.
 
 ---
 

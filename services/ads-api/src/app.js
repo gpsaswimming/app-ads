@@ -49,6 +49,7 @@ export function buildApp(ctx, opts = {}) {
   app.get('/admin-api/ads/:adId/artwork', admin.artwork);
   app.post('/admin-api/ads/:adId/approve', admin.approve);
   app.post('/admin-api/ads/:adId/deny', admin.deny);
+  app.post('/admin-api/ads/:adId/payment', admin.setPayment);
 
   // /api/team/* — the team-facing ad status list (§12). Read-only, no app auth (like
   // /admin-api/*); served on the separate team-ads origin. The public form front 404s this

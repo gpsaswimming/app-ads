@@ -94,6 +94,17 @@
         dl.detail { display: grid; grid-template-columns: 34% 1fr; gap: 8px 14px; margin: 0 0 20px; }
         dl.detail dt { color: var(--mut); font-size: .8rem; }
         dl.detail dd { margin: 0; font-size: .88rem; word-break: break-word; }
+        /* Invoice status picker (league ads only — team ads have no tracked payment) */
+        .pay-picker { display: flex; gap: 5px; flex-wrap: wrap; }
+        .pill { border: 1px solid var(--line); background: var(--card); color: var(--mut);
+                border-radius: 999px; padding: 3px 11px; font-size: .76rem; font-weight: 600;
+                cursor: pointer; font-family: inherit; }
+        .pill:hover:not(:disabled) { border-color: var(--navy); color: var(--navy); }
+        .pill:disabled { cursor: default; }
+        .pill.on.p-PAID { background: #dcf3e8; color: #0e6e4a; border-color: #b6e2cd; }
+        .pill.on.p-PENDING { background: #fdf0d5; color: #8a5a00; border-color: #f0dcae; }
+        .pill.on.p-WAIVED { background: #e7ecf6; color: #45536e; border-color: #d3dcee; }
+
         .notes { background: #fdf0d5; color: #7a5000; border-radius: 8px; padding: 11px 13px;
                  font-size: .85rem; margin-bottom: 18px; }
         .drawer-actions { display: flex; gap: 10px; }

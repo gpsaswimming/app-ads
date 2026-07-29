@@ -32,14 +32,26 @@ const SUMMARY_COLS = [
 
 // Widths are sized to the *header* labels, which never wrap — a wrapped label would
 // collide with the band below it.
+//
+// The two pages carry different columns. A team's ads are collected by the team, so there
+// is no payment status to show — just what each ad earns and GPSA's half. League ads are
+// billed by GPSA and carry no 50% share, so that page shows the invoice status instead.
 const TEAM_COLS = [
-  { key: 'who', label: 'Advertiser / Ad', width: 154 },
+  { key: 'who', label: 'Advertiser / Ad', width: 200 },
   { key: 'placement', label: 'Placement', width: 66 },
   { key: 'submitted', label: 'Submitted', width: 66 },
-  { key: 'status', label: 'Status', width: 60 },
-  { key: 'payment', label: 'Payment', width: 60 },
-  { key: 'amount', label: 'Amount', width: 54, align: 'right' },
-  { key: 'share', label: 'GPSA 50%', width: 56, align: 'right' },
+  { key: 'status', label: 'Status', width: 62 },
+  { key: 'amount', label: 'Amount', width: 60, align: 'right' },
+  { key: 'share', label: 'GPSA 50%', width: 62, align: 'right' },
+];
+
+const LEAGUE_COLS = [
+  { key: 'who', label: 'Advertiser / Ad', width: 170 },
+  { key: 'placement', label: 'Placement', width: 66 }, // 66 is the width PLACEMENT needs
+  { key: 'submitted', label: 'Submitted', width: 66 },
+  { key: 'status', label: 'Status', width: 62 },
+  { key: 'payment', label: 'Invoice', width: 80 },
+  { key: 'amount', label: 'Amount', width: 72, align: 'right' },
 ];
 
 const money = (cents) => {
@@ -196,7 +208,7 @@ function drawSummary(doc, report) {
     aside: [
       { label: 'Ad revenue (all approved ads)', value: money(t.gross_cents) },
       { label: 'Billed by GPSA directly', value: money(t.gpsa_direct_cents) },
-      { label: 'Advertisers not yet paid', value: `${money(t.unpaid_cents)} (${t.unpaid_count})` },
+      { label: 'League invoices unpaid', value: `${money(t.unpaid_cents)} (${t.unpaid_count})` },
       { label: 'Approved ads', value: `${t.ad_count} — ${t.full_count} full / ${t.half_count} half` },
     ],
   });
@@ -212,7 +224,10 @@ function drawSummary(doc, report) {
       team: {
         text: g.team,
         bold: true,
-        sub: g.unpaid_count ? `${g.unpaid_count} unpaid · ${money(g.unpaid_cents)}` : null,
+        // Only the league group can carry this — team payments aren't tracked.
+        sub: g.unpaid_count
+          ? `${plural(g.unpaid_count, 'invoice', 'invoices')} unpaid · ${money(g.unpaid_cents)}`
+          : null,
       },
       full: { text: String(g.full_count) },
       half: { text: String(g.half_count) },
@@ -234,9 +249,10 @@ function drawSummary(doc, report) {
   });
 
   y += 16;
-  y = note(doc, y, 'Teams collect from their advertisers and remit 50% to GPSA. GPSA-affiliation ads '
-    + '(check or Square invoice) are billed by GPSA directly and are not a team debt. Amounts due are '
-    + 'gross — they do not change when an advertiser pays.');
+  y = note(doc, y, 'Teams collect from their advertisers and remit 50% to GPSA — that amount is owed '
+    + 'whether or not the advertiser has paid the team, and GPSA does not track those payments. '
+    + 'GPSA-affiliation ads are billed by GPSA directly (check or Square invoice); those invoices are '
+    + 'the only payments tracked here, and they are not a team debt.');
   if (t.pending_count) {
     note(doc, y, `${plural(t.pending_count, 'ad is', 'ads are')} still under review `
       + `(${money(t.pending_cents)}) and not counted above. They are listed on each team's page.`, AMBER);
@@ -257,7 +273,7 @@ function drawTeamPage(doc, report, g) {
       note: 'Paid to GPSA directly — not a team debt',
       aside: [
         { label: 'Approved ads', value: `${g.ad_count} — ${g.full_count} full / ${g.half_count} half` },
-        { label: 'Advertisers not yet paid', value: `${money(g.unpaid_cents)} (${g.unpaid_count})` },
+        { label: 'Invoices unpaid', value: `${money(g.unpaid_cents)} (${g.unpaid_count})` },
       ],
     })
     : dueBox(doc, y, {
@@ -267,28 +283,30 @@ function drawTeamPage(doc, report, g) {
       aside: [
         { label: 'Ad revenue (collected by the team)', value: money(g.gross_cents) },
         { label: 'Team keeps', value: money(g.team_keeps_cents) },
-        { label: 'Advertisers not yet paid', value: `${money(g.unpaid_cents)} (${g.unpaid_count})` },
         { label: 'Approved ads', value: `${g.ad_count} — ${g.full_count} full / ${g.half_count} half` },
       ],
     });
 
-  y = tableHeader(doc, y, TEAM_COLS);
+  const cols = g.is_gpsa ? LEAGUE_COLS : TEAM_COLS;
+  y = tableHeader(doc, y, cols);
   g.ads.forEach((a, i) => {
     // A long team could overflow a page — carry the table onto the next one.
     if (y + 26 > BOTTOM) {
       doc.addPage();
       y = banner(doc, `${g.team} (continued)`, subtitle);
-      y = tableHeader(doc, y, TEAM_COLS);
+      y = tableHeader(doc, y, cols);
     }
     const isPending = a.status !== 'APPROVED';
-    y = tableRow(doc, y, TEAM_COLS, {
+    y = tableRow(doc, y, cols, {
       who: { text: a.company_name || '—', bold: true, sub: a.ad_title || null },
       placement: { text: placementLabel(a.placement) },
       submitted: { text: shortDate(a.submitted_at), color: MUTED },
       status: { text: words(a.status), color: isPending ? AMBER : INK, size: 7.5 },
+      // League page only: how GPSA billed it and whether that invoice is settled.
       payment: { text: words(a.payment_status) || '—', sub: words(a.payment_method) || null, size: 7.5 },
       amount: { text: money(a.amount_cents), color: isPending ? MUTED : INK },
-      share: isPending || g.is_gpsa
+      // Team page only: an under-review ad earns nothing until it is approved.
+      share: isPending
         ? { text: '—', color: MUTED }
         : { text: money(a.gpsa_due_cents), bold: true, color: NAVY },
     }, { fill: i % 2 ? ZEBRA : null, height: 26 });
@@ -298,13 +316,11 @@ function drawTeamPage(doc, report, g) {
     y = note(doc, y + 8, 'No ads for this team.');
   }
 
-  y = totalsRow(doc, y, TEAM_COLS, {
-    // Keep this label short — the column is 154pt wide and a wrapped label breaks the row.
+  y = totalsRow(doc, y, cols, {
+    // Keep this label short — a wrapped label would break the row.
     who: { text: 'Approved total', bold: true },
     amount: { text: money(g.gross_cents), bold: true },
-    share: g.is_gpsa
-      ? { text: '—', color: MUTED }
-      : { text: money(g.gpsa_due_cents), bold: true, color: NAVY, size: 10 },
+    share: { text: money(g.gpsa_due_cents), bold: true, color: NAVY, size: 10 },
   });
 
   y += 14;
@@ -314,10 +330,10 @@ function drawTeamPage(doc, report, g) {
       + 'until they are approved.', AMBER);
   }
   note(doc, y, g.is_gpsa
-    ? 'These ads are billed to the advertiser by GPSA directly (check or Square invoice). '
-      + 'No team remits anything for them.'
-    : `Please remit ${money(g.gpsa_due_cents)} to GPSA. Amounts are gross — the total due does `
-      + 'not change when an advertiser pays the team.');
+    ? 'These ads are billed to the advertiser by GPSA directly (check or Square invoice), so '
+      + 'the invoice status above is tracked here. No team remits anything for them.'
+    : `Please remit ${money(g.gpsa_due_cents)} to GPSA. The team collects from its advertisers `
+      + 'itself — GPSA does not track those payments, and the amount due stands either way.');
 }
 
 /** Page N of M, stamped after all pages exist. */

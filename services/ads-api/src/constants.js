@@ -30,6 +30,12 @@ export const PLACEMENTS = ['FULL_SCREEN', 'HALF_SCREEN'];
 
 export const PAYMENT_METHODS = ['PAY_TEAM', 'CHECK', 'SQUARE_INVOICE'];
 
+// Payment status is only tracked for LEAGUE (GPSA-affiliation) ads — those are billed by
+// GPSA itself (check / Square invoice), so GPSA sees the money arrive. A team-affiliation
+// ad is collected by the team from its advertiser; GPSA never sees that transaction and
+// does not track it. The team's 50% remittance is owed either way.
+export const PAYMENT_STATUSES = ['PENDING', 'PAID', 'WAIVED'];
+
 export const CONTENT_TYPES = ['image/png', 'image/jpeg'];
 
 // Locked 150-DPI validation targets (DESIGN.md §5). Aspect is fixed regardless of

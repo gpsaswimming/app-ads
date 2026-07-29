@@ -110,17 +110,29 @@ test('rejected and in-flight ads are left out of the report entirely', () => {
   assert.equal(data.totals.gpsa_due_cents, 0);
 });
 
-test('unpaid tally chases PENDING only — PAID and WAIVED are settled', () => {
+test('league invoices: unpaid tally chases PENDING only — PAID and WAIVED are settled', () => {
+  const gpsa = byTeam(report([
+    row({ Team: 'GPSA', Payment_Method: 'CHECK', Payment_Status: 'PENDING', Payment_Amount: FULL }),
+    row({ Team: 'GPSA', Payment_Method: 'SQUARE_INVOICE', Payment_Status: 'PAID', Payment_Amount: HALF }),
+    row({ Team: 'GPSA', Payment_Method: 'CHECK', Payment_Status: 'WAIVED', Payment_Amount: HALF }),
+  ]), 'GPSA');
+
+  assert.equal(gpsa.unpaid_count, 1);
+  assert.equal(gpsa.unpaid_cents, FULL);
+});
+
+test('team ads carry no payment tracking — the team collects, GPSA does not watch it', () => {
   const riverdale = byTeam(report([
     row({ Team: 'Riverdale', Payment_Status: 'PENDING', Payment_Amount: FULL }),
     row({ Team: 'Riverdale', Payment_Status: 'PAID', Payment_Amount: HALF }),
-    row({ Team: 'Riverdale', Payment_Status: 'WAIVED', Payment_Amount: HALF }),
   ]), 'Riverdale');
 
-  assert.equal(riverdale.unpaid_count, 1);
-  assert.equal(riverdale.unpaid_cents, FULL);
-  // Payment status never changes what the team owes GPSA — it's a gross obligation.
-  assert.equal(riverdale.gpsa_due_cents, (FULL + HALF + HALF) / 2);
+  assert.equal(riverdale.unpaid_count, 0);
+  assert.equal(riverdale.unpaid_cents, 0);
+  // Not even reported per ad — nothing maintains it.
+  assert.deepEqual(riverdale.ads.map((a) => a.payment_status), [null, null]);
+  // What the team owes GPSA is unaffected either way — it's a gross obligation.
+  assert.equal(riverdale.gpsa_due_cents, (FULL + HALF) / 2);
 });
 
 test("a team's page lists its ads newest-first with per-ad amount and share", () => {
@@ -133,7 +145,6 @@ test("a team's page lists its ads newest-first with per-ad amount and share", ()
   assert.deepEqual(wendwood.ads.map((a) => a.ad_title), ['Newer', 'Older']);
   assert.equal(wendwood.ads[0].amount_cents, FULL);
   assert.equal(wendwood.ads[0].gpsa_due_cents, FULL / 2);
-  assert.equal(wendwood.ads[0].payment_status, 'PENDING');
   assert.equal(
     wendwood.ads.reduce((s, a) => s + a.gpsa_due_cents, 0),
     wendwood.gpsa_due_cents, // the page total matches the summary row
