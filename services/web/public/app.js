@@ -70,14 +70,21 @@
       return;
     }
     turnstileRendered = true;
-    turnstileWidgetId = window.turnstile.render('#turnstile-widget', {
-      sitekey: siteKey,
-      theme: 'light',
-      size: 'flexible', // expand to the container width (full-width) to match the form
-      callback: (token) => { turnstileToken = token; },
-      'error-callback': () => { turnstileToken = null; },
-      'expired-callback': () => { turnstileToken = null; },
-    });
+    // render() can throw (blocked storage, hostile privacy settings). Contain it: the
+    // submit path already refuses to POST without a token, and letting it escape here
+    // would abort init() and leave the whole form unwired.
+    try {
+      turnstileWidgetId = window.turnstile.render('#turnstile-widget', {
+        sitekey: siteKey,
+        theme: 'light',
+        size: 'flexible', // expand to the container width (full-width) to match the form
+        callback: (token) => { turnstileToken = token; },
+        'error-callback': () => { turnstileToken = null; },
+        'expired-callback': () => { turnstileToken = null; },
+      });
+    } catch (err) {
+      console.error('Turnstile failed to render:', err);
+    }
   }
   // Cloudflare's api.js calls this onload; also invoked from init() in case api.js
   // finished loading before app.js ran. Either path is idempotent.
@@ -501,8 +508,8 @@
   }
 
   function init() {
+    renderDeadline();  // before Turnstile: a widget failure must not swallow the deadline
     renderTurnstile(); // in case api.js already loaded before this script
-    renderDeadline();
 
     if (isClosed()) { showClosed(); return; }
 
