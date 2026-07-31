@@ -28,8 +28,19 @@ never edge-routed). Layer a shared token on later if the trust model tightens.
         the Gemini-pass path) then sets `APPROVED`, so manually-approved artwork is picked
         up by the meet-director export (which globs `approved_*`); `deny` sets `REJECTED`
         with a reason. Both email the submitter the final outcome (non-fatal on SMTP error).
-- [ ] **Bulk export** — download all approved artwork for the meet (today: the
-      `export-approved.sh` CLI). Dashboard button that zips/grabs `approved_*`.
+- [x] **Bulk export** — download all approved artwork for the meet (previously the
+      `export-approved.sh` CLI, which stays as the LAN fallback).
+      - ✅ **Done.** `GET /admin-api/export.zip` streams one ZIP of every APPROVED ad's
+        artwork, laid out for building the scoreboard deck: `full-screen/` and
+        `half-screen/` folders, numbered, each file named for its advertiser
+        (`full-screen/01_acme-insurance.png`). The dashboard button is labelled with the
+        count and switches off when nothing is approved. `src/reports/artwork-export.js`
+        plans the entries and writes the archive: entries are **STORED** (PNG/JPEG are
+        already compressed), so the container is ~60 lines of headers and needs no
+        archiver dependency — worth it to keep the sole credentialed component's dependency
+        surface small. Objects are fetched one at a time and streamed out, so only one
+        image is ever in memory; a failed fetch destroys the stream (a loudly broken
+        download) rather than handing over a deck quietly missing an ad.
 - [x] **Treasurer report — how much each team owes.** Aggregate `Payment_Amount` by team
       and payment status. Rules encoded:
       - `PAY_TEAM` ads → the advertiser pays the **team**; the team remits **GPSA's 50%**.

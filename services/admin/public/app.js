@@ -167,8 +167,18 @@
     return b;
   }
 
+  /** Artwork export: label it with what's in it, and switch it off when nothing is approved. */
+  function renderExport() {
+    const n = ads.filter((a) => a.status === 'APPROVED' && a.has_artwork).length;
+    const a = $('export');
+    a.textContent = n ? `⤓ Approved artwork (${n})` : '⤓ Approved artwork';
+    a.classList.toggle('off', n === 0);
+    a.setAttribute('aria-disabled', n === 0 ? 'true' : 'false');
+  }
+
   function render() {
     renderFilters();
+    renderExport();
     const flt = FILTERS.find((f) => f.key === active) || FILTERS[0];
     const rows = ads.filter((a) => flt.match(a.status));
     const tbody = $('rows');

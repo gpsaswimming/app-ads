@@ -9,6 +9,7 @@
 import { isTeamAffiliated } from '../billing.js';
 import { PAYMENT_STATUSES, STATUS } from '../constants.js';
 import { keyFromUri } from '../clients/minio.js';
+import { artworkZipFilename, createArtworkZip, planArtworkExport } from '../reports/artwork-export.js';
 import { buildTreasurerReport } from '../reports/treasurer.js';
 import { renderTreasurerPdf, treasurerPdfFilename } from '../reports/treasurer-pdf.js';
 
@@ -178,5 +179,26 @@ export function makeAdminHandlers(ctx) {
       .send(pdf);
   }
 
-  return { list, artwork, approve, deny, setPayment, treasurerPdf };
+  /**
+   * GET /admin-api/export.zip — every approved ad's artwork, for building the scoreboard
+   * deck. Same set the `export-approved.sh` LAN helper pulls, one click instead of `mc`:
+   * foldered by placement, numbered, named for the advertiser. Streamed an object at a
+   * time — the API is the only component that can read the private bucket.
+   */
+  async function exportZip(request, reply) {
+    const rows = await noco.listAds({ limit: 1000 });
+    const entries = planArtworkExport(rows, bucket);
+    if (entries.length === 0) {
+      return reply.code(404).send({ error: 'NO_APPROVED_ARTWORK' });
+    }
+
+    log.info({ ads: entries.length }, 'artwork export requested');
+    return reply
+      .header('content-disposition', `attachment; filename="${artworkZipFilename(ctx.config?.meetName)}"`)
+      .header('cache-control', 'private, no-store')
+      .type('application/zip')
+      .send(createArtworkZip(entries, (key) => minio.getObjectBuffer(key)));
+  }
+
+  return { list, artwork, approve, deny, setPayment, treasurerPdf, exportZip };
 }
