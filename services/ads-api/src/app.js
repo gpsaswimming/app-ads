@@ -46,6 +46,7 @@ export function buildApp(ctx, opts = {}) {
   // by design — the VPN boundary is the trust boundary (docs/TODO.md #1).
   app.get('/admin-api/ads', admin.list);
   app.get('/admin-api/treasurer.pdf', admin.treasurerPdf);
+  app.get('/admin-api/export.zip', admin.exportZip);
   app.get('/admin-api/ads/:adId/artwork', admin.artwork);
   app.post('/admin-api/ads/:adId/approve', admin.approve);
   app.post('/admin-api/ads/:adId/deny', admin.deny);

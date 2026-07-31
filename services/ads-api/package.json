@@ -5,7 +5,7 @@
   "description": "GPSA Scoreboard Ads — Ads API (Fastify). The only credentialed component.",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "main": "src/server.js",
   "scripts": {

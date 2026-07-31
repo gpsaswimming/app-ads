@@ -200,6 +200,30 @@ test('POST payment → 409 on a team ad: the team collects, GPSA does not track 
   assert.equal(noco.rows.get(adId).Payment_Status, 'PENDING'); // untouched
 });
 
+test('GET /admin-api/export.zip returns the approved artwork as one download', async () => {
+  const { app, minio } = makeTestApp(flagIt);
+  const approvedId = await submitToNeedsReview(app);
+  await app.inject({ method: 'POST', url: `/admin-api/ads/${approvedId}/approve` });
+  await submitToNeedsReview(app); // left NEEDS_REVIEW — must not be in the deck
+
+  const res = await app.inject({ method: 'GET', url: '/admin-api/export.zip' });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers['content-type'], 'application/zip');
+  assert.match(res.headers['content-disposition'], /attachment; filename="gpsa-ads-2026-city-meet-\d{4}-\d{2}-\d{2}\.zip"/);
+  assert.equal(res.rawPayload.subarray(0, 4).toString('binary'), 'PK');
+  // One entry: only the approved ad's object was read out of the bucket.
+  assert.deepEqual(minio.calls.get.filter((k) => k.includes('approved_')), [`${approvedId}/approved_summer-special.png`]);
+  assert.equal(res.rawPayload.includes(Buffer.from('full-screen/01_joe-s-pizza.png')), true);
+});
+
+test('GET /admin-api/export.zip → 404 when nothing is approved yet', async () => {
+  const { app } = makeTestApp();
+  await submitOne(app);
+  const res = await app.inject({ method: 'GET', url: '/admin-api/export.zip' });
+  assert.equal(res.statusCode, 404);
+  assert.equal(res.json().error, 'NO_APPROVED_ARTWORK');
+});
+
 test('admin actions on an unknown Ad_ID → 404', async () => {
   const { app } = makeTestApp();
   for (const url of ['/admin-api/ads/nope/artwork', '/admin-api/ads/nope/approve', '/admin-api/ads/nope/deny']) {
