@@ -2,7 +2,7 @@
 # Secret-free, environment-agnostic image: every value is injected at runtime via
 # ads-api.env. Runs as a non-root user with a container healthcheck on /health.
 
-FROM node:22-alpine
+FROM node:24-alpine
 
 ENV NODE_ENV=production
 WORKDIR /app
